@@ -35,6 +35,10 @@ jobs:
           if: runner.os == 'Linux'
           run: sudo apt-get update && sudo apt-get install -y ninja-build clang-tidy
 
+        - name: Match vcpkg triplet to MinGW toolchain (Windows)
+          if: runner.os == 'Windows'
+          run: echo "VCPKG_DEFAULT_TRIPLET=x64-mingw-static" >> $GITHUB_ENV
+
         - name: Configure
           run: cmake --preset default
         - name: Build
@@ -48,17 +52,17 @@ jobs:
 
         - name: Build with sanitizers
           if: runner.os != 'Windows'
-          run: cmake --build build/build-asan
+          run: cmake --build build/asan
 
         - name: Test (Linux — full ASan+UBSan+LSan)
           if: runner.os == 'Linux'
-          run: ctest --test-dir build/build-asan --output-on-failure
+          run: ctest --test-dir build/asan --output-on-failure
 
         - name: Test (macOS — ASan+UBSan only, leak detection unreliable on Apple Silicon)
           if: runner.os == 'macOS'
           env:
             ASAN_OPTIONS: detect_leaks=0
-          run: ctest --test-dir build/build-asan --output-on-failure
+          run: ctest --test-dir build/asan --output-on-failure
 
   clang-tidy:
     runs-on: ubuntu-latest
