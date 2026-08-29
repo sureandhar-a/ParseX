@@ -5,4 +5,4 @@ add_executable(parsex-cli main.cpp)
 find_package(CLI11 CONFIG REQUIRED)
 
 # LINK DEPENDENCIES TO EXECUTABLE
-target_link_libraries(parsex-cli PRIVATE libparsex CLI11::CLI11)
+target_link_libraries(parsex-cli PRIVATE libparsex CLI11::CLI11 CLI11::Module)
