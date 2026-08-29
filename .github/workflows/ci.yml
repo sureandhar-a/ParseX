@@ -6,6 +6,8 @@ on:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
     steps:
       - uses: actions/checkout@v4
         with:
