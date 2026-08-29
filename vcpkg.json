@@ -1,0 +1,10 @@
+{
+    "name": "parsex",
+    "version": "1.0.0",
+    "dependencies": [
+        "libxml2",
+        "nlohmann-json",
+        "cli11",
+        "gtest"
+    ]
+}
