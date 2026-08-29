@@ -6,6 +6,8 @@ on:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
     steps:
       - uses: actions/checkout@v4
         with:
@@ -19,11 +21,11 @@ jobs:
           key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
       - name: Bootstrap vcpkg
         run: ./vcpkg/bootstrap-vcpkg.sh
-      - name: Install Ninja
-        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang-tidy
       - name: Configure
         run: cmake --preset default
       - name: Build
-        run: cmake --build build
+        run: cmake --build build/debug
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build/debug --output-on-failure
