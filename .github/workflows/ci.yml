@@ -35,13 +35,13 @@ jobs:
           if: runner.os == 'Linux'
           run: sudo apt-get update && sudo apt-get install -y ninja-build clang-tidy
 
-        - name: Match vcpkg triplet to MinGW toolchain (Windows)
-          if: runner.os == 'Windows'
-          shell: bash
-          run: echo "VCPKG_DEFAULT_TRIPLET=x64-mingw-static" >> "$GITHUB_ENV"
-
-        - name: Configure
+        - name: Configure (Unix)
+          if: runner.os != 'Windows'
           run: cmake --preset default
+
+        - name: Configure (Windows)
+          if: runner.os == 'Windows'
+          run: cmake --preset default -DVCPKG_TARGET_TRIPLET=x64-mingw-static
         - name: Build
           run: cmake --build build/debug
         - name: Test
