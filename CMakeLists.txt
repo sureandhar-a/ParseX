@@ -10,7 +10,10 @@ project(ParseX LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS)
-set(CMAKE_CXX_CLANG_TIDY "$ENV{HOMEBREW_PREFIX}/opt/llvm/bin/clang-tidy")
+find_program(CLANG_TIDY_EXE NAMES clang-tidy PATHS "$ENV{HOMEBREW_PREFIX}/opt/llvm/bin")
+if(CLANG_TIDY_EXE)
+    set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")
+endif()
 
 include(CTest)
 # Enable testing in the root so CTest can find all tests
