@@ -37,7 +37,8 @@ jobs:
 
         - name: Match vcpkg triplet to MinGW toolchain (Windows)
           if: runner.os == 'Windows'
-          run: echo "VCPKG_DEFAULT_TRIPLET=x64-mingw-static" >> $GITHUB_ENV
+          shell: bash
+          run: echo "VCPKG_DEFAULT_TRIPLET=x64-mingw-static" >> "$GITHUB_ENV"
 
         - name: Configure
           run: cmake --preset default
