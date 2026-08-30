@@ -1,6 +1,7 @@
 # Create the test executable for include-level checks.
 add_executable(include_tests
     parsex/raw/raw_span_test.cpp # RawSpan unit test source file
+    parsex/raw/raw_document_test.cpp # RawDocument unit test
 )
 # Link the test binary to the project library and GoogleTest.
 target_link_libraries(
