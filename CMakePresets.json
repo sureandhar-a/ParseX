@@ -52,5 +52,20 @@
       "name": "build-asan",
       "configurePreset": "build-asan"
     }
-  ]
+  ],
+    "testPresets":[
+      {
+      "name": "default",
+      "displayName": "Default Test Run",
+      "description": "Runs all tests with verbose output on failure",
+      "configurePreset": "default",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": false
+      }
+    }
+    ]
 }

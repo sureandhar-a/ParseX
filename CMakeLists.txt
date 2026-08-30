@@ -9,6 +9,12 @@ project(ParseX LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+if(MINGW)
+    # Statically link the MinGW runtime so binaries don't depend on finding
+    # the matching libstdc++/libgcc/libwinpthread DLLs on PATH at run time.
+    add_link_options(-static-libgcc -static-libstdc++ -static)
+endif()
 find_program(CLANG_TIDY_EXE NAMES clang-tidy PATHS "$ENV{HOMEBREW_PREFIX}/opt/llvm/bin")
 if(CLANG_TIDY_EXE)
     set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")

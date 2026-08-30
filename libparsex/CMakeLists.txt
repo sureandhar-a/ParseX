@@ -4,6 +4,9 @@ add_library(libparsex STATIC src/version.cpp)
 # Tell targets linking against libparsex where to find its header files
 target_include_directories(libparsex PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+target_include_directories(libparsex INTERFACE include)
+
+
 find_package(LibXml2 REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
