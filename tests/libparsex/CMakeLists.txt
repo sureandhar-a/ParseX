@@ -1,3 +1,4 @@
+add_subdirectory(include)
 add_subdirectory(parser)
 add_subdirectory(schema)
 add_subdirectory(model)
