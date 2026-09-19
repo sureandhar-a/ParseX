@@ -10,11 +10,17 @@
 #include <parsex/raw/raw_document.hpp>
 #include <filesystem>
 #include <memory>
+#include <string>
 
 namespace {
 
 RawDocument loadRawDocument(const std::filesystem::path& path) {
-    xmlDoc* rawDoc = xmlReadFile(path.c_str(), nullptr, 0);
+    // path::c_str() is wchar_t on Windows and u8string() is char8_t here,
+    // but libxml2 wants UTF-8 char: copy the UTF-8 code units byte-for-byte.
+    // (One named temporary: each u8string() call returns its own buffer.)
+    const auto utf8Path = path.u8string();
+    const std::string narrowPath{utf8Path.begin(), utf8Path.end()};
+    xmlDoc* rawDoc = xmlReadFile(narrowPath.c_str(), nullptr, 0);
     EXPECT_NE(rawDoc, nullptr) << "Failed to parse XML fixture: " << path;
     return RawDocument{XmlDocPtr(rawDoc, XmlDocDeleter{})};
 }
