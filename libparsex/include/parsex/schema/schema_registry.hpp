@@ -18,10 +18,13 @@ struct OperationTelemetry;
 // default, or the source tree) is copied into the cache atomically and then
 // parsed (wasCacheHit=false).
 //
-// Throws std::runtime_error when the release is unknown or a file cannot be
-// parsed. (Interim: the dedicated SchemaResolutionError arrives in the
-// error-handling subtask. Release-string validation against the known set
-// arrives there too.)
+// Throws SchemaResolutionError (see schema_resolution_error.hpp) carrying
+// the requested release and a reason: UnsupportedRelease (no <release>.xsd
+// in any source — the common typo/unsupported-string case),
+// SchemaFileMissing (a needed file vanished or is unreadable), or
+// SchemaFileCorrupt (libxml2 rejected an existing file, with its error text
+// folded into the message). A cache-write failure is NOT fatal: the schema
+// is served by parsing the source directly instead.
 //
 // If telemetry is non-null, the parse step is timed as
 // "SchemaRegistry.resolveSchema"; nullptr costs nothing.

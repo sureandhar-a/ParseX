@@ -22,28 +22,35 @@ std::filesystem::path testScratchDir() {
 }
 
 // Truncated garbage: what a kill -9 mid-write could leave in the temp file.
-// Must never become observable at the final path.
-const std::string kGarbage = "<xs:schema><trunca";
+// Must never become observable at the final path. Function-local statics
+// keep dynamic initialization out of namespace scope.
+const std::string& garbagePayload() {
+    static const std::string value = "<xs:schema><trunca";
+    return value;
+}
 
-const std::string kGoodPayload =
-    "<?xml version=\"1.0\"?>\n<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"/>\n";
+const std::string& goodPayload() {
+    static const std::string value =
+        "<?xml version=\"1.0\"?>\n<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"/>\n";
+    return value;
+}
 
 std::string readFileBytes(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    std::ifstream input(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
 }
 
 void clearScratch() {
-    std::error_code ec;
-    std::filesystem::remove_all(testScratchDir(), ec);
-    std::filesystem::create_directories(testScratchDir(), ec);
+    std::error_code errCode;
+    std::filesystem::remove_all(testScratchDir(), errCode);
+    std::filesystem::create_directories(testScratchDir(), errCode);
 }
 
 // Simulates dying after the temp write but before rename().
 std::filesystem::path dieMidWrite(
     const std::filesystem::path& dir, const std::string& filename) {
     const auto tmp = detail::makeTmpPath(dir, filename);
-    detail::writeTmpFileSync(tmp, kGarbage);
+    detail::writeTmpFileSync(tmp, garbagePayload());
     return tmp;  // rename() deliberately skipped — process "died" here
 }
 
@@ -67,13 +74,13 @@ TEST(CacheAtomicityTest, InterruptedOverwritePreservesPreviousGoodContents) {
     clearScratch();
     const auto dir = testScratchDir();
     const auto finalPath = dir / "4.2.2.xsd.cache";
-    writeCacheAtomically(finalPath, kGoodPayload);
-    ASSERT_EQ(readFileBytes(finalPath), kGoodPayload);
+    writeCacheAtomically(finalPath, goodPayload());
+    ASSERT_EQ(readFileBytes(finalPath), goodPayload());
 
     dieMidWrite(dir, "4.2.2.xsd.cache");
 
     // Previous good contents survive; the garbage never replaced them.
-    EXPECT_EQ(readFileBytes(finalPath), kGoodPayload);
+    EXPECT_EQ(readFileBytes(finalPath), goodPayload());
 
     clearScratch();
 }
@@ -88,18 +95,18 @@ TEST(CacheAtomicityTest, RecoverySucceedsAndLeftoverTmpIsIgnored) {
     ASSERT_TRUE(std::filesystem::exists(leftover));
 
     // The next normal attempt recovers cleanly with full contents.
-    writeCacheAtomically(finalPath, kGoodPayload);
-    EXPECT_EQ(readFileBytes(finalPath), kGoodPayload);
+    writeCacheAtomically(finalPath, goodPayload());
+    EXPECT_EQ(readFileBytes(finalPath), goodPayload());
 
     // Resolution reads ONLY the final path (never globs for temp files), so
     // the leftover cannot confuse a later resolveSchema() call: the final
     // path holds exactly the good payload despite the stray beside it.
     // (The next PBI's resolveSchema() must preserve this rule.)
     EXPECT_TRUE(std::filesystem::exists(leftover));
-    std::ifstream finalIn(finalPath, std::ios::binary);
-    EXPECT_EQ(
-        std::string(std::istreambuf_iterator<char>(finalIn), std::istreambuf_iterator<char>()),
-        kGoodPayload);
+    std::ifstream finalInput(finalPath, std::ios::binary);
+    const std::string finalBytes{
+        std::istreambuf_iterator<char>(finalInput), std::istreambuf_iterator<char>()};
+    EXPECT_EQ(finalBytes, goodPayload());
 
     clearScratch();
 }

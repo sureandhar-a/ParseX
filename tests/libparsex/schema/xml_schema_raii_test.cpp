@@ -11,6 +11,7 @@
 #include <libxml/xmlschemas.h>
 #include <parsex/schema/xml_schema_raii.hpp>
 
+#include <array>
 #include <cstdarg>
 #include <cstdio>
 #include <filesystem>
@@ -25,23 +26,28 @@ struct ErrorLog {
 };
 
 void appendFormatted(ErrorLog* log, const char* msg, va_list args) {
-    char buf[1024];
-    vsnprintf(buf, sizeof(buf), msg, args);
-    log->lastMessage = buf;
+    std::array<char, 1024> buf{};
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): libxml2 hands us a C va_list.
+    std::vsnprintf(buf.data(), buf.size(), msg, args);
+    log->lastMessage = buf.data();
 }
 
+// NOLINTNEXTLINE(modernize-avoid-variadic-functions): signature mandated by libxml2's xmlSchemaValidityErrorFunc.
 void onSchemaError(void* ctx, const char* msg, ...) {
     auto* log = static_cast<ErrorLog*>(ctx);
     ++log->errorCount;
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,cppcoreguidelines-init-variables): va_start protocol.
     va_list args;
     va_start(args, msg);
     appendFormatted(log, msg, args);
     va_end(args);
 }
 
+// NOLINTNEXTLINE(modernize-avoid-variadic-functions): signature mandated by libxml2's xmlSchemaValidityWarningFunc.
 void onSchemaWarning(void* ctx, const char* msg, ...) {
     auto* log = static_cast<ErrorLog*>(ctx);
     ++log->warningCount;
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,cppcoreguidelines-init-variables): va_start protocol.
     va_list args;
     va_start(args, msg);
     appendFormatted(log, msg, args);

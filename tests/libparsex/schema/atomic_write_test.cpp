@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <parsex/schema/atomic_write.hpp>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -16,25 +17,24 @@ std::filesystem::path testScratchDir() {
 }
 
 std::string readFileBytes(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    std::ifstream input(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
 }
 
 bool hasTmpStrays(const std::filesystem::path& dir) {
-    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
-        if (entry.path().filename().string().find(".tmp.") != std::string::npos) {
-            return true;
-        }
-    }
-    return false;
+    return std::ranges::any_of(
+        std::filesystem::directory_iterator(dir), std::filesystem::directory_iterator{},
+        [](const std::filesystem::directory_entry& entry) {
+            return entry.path().filename().string().find(".tmp.") != std::string::npos;
+        });
 }
 
 }  // namespace
 
 TEST(AtomicWriteTest, WrittenEntryReadsBackByteForByte) {
     const auto dir = testScratchDir();
-    std::error_code ec;
-    std::filesystem::remove_all(dir, ec);
+    std::error_code errCode;
+    std::filesystem::remove_all(dir, errCode);
 
     const std::string payload =
         std::string("<?xml version=\"1.0\"?>\n<xs:schema>\n") +
@@ -46,13 +46,13 @@ TEST(AtomicWriteTest, WrittenEntryReadsBackByteForByte) {
 
     EXPECT_EQ(readFileBytes(target), payload);
 
-    std::filesystem::remove_all(dir, ec);
+    std::filesystem::remove_all(dir, errCode);
 }
 
 TEST(AtomicWriteTest, NoTmpFilesLeftAfterSuccessfulWrite) {
     const auto dir = testScratchDir();
-    std::error_code ec;
-    std::filesystem::remove_all(dir, ec);
+    std::error_code errCode;
+    std::filesystem::remove_all(dir, errCode);
 
     writeCacheAtomically(dir / "4.2.2.xsd.cache", "<schema>first</schema>");
     writeCacheAtomically(dir / "4.2.2.xsd.cache", "<schema>second</schema>");
@@ -60,5 +60,5 @@ TEST(AtomicWriteTest, NoTmpFilesLeftAfterSuccessfulWrite) {
     EXPECT_FALSE(hasTmpStrays(dir));
     EXPECT_EQ(readFileBytes(dir / "4.2.2.xsd.cache"), "<schema>second</schema>");
 
-    std::filesystem::remove_all(dir, ec);
+    std::filesystem::remove_all(dir, errCode);
 }

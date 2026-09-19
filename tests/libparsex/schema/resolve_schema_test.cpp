@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 #include <parsex/schema/schema_registry.hpp>
+#include <parsex/schema/schema_resolution_error.hpp>
 #include <parsex/telemetry/operation_telemetry.hpp>
 
 #include <cstdlib>
@@ -44,6 +45,8 @@ public:
     }
     EnvGuard(const EnvGuard&) = delete;
     EnvGuard& operator=(const EnvGuard&) = delete;
+    EnvGuard(EnvGuard&&) noexcept = default;
+    EnvGuard& operator=(EnvGuard&&) noexcept = default;
 
 private:
     static std::optional<std::string> readEnv(const char* name) {
@@ -74,14 +77,14 @@ struct TestDirs {
 // EnvGuard declared BEFORE this call so env is restored afterwards.
 TestDirs makeIsolatedDirs(const std::string& release) {
     const auto root = std::filesystem::temp_directory_path() / "parsex_resolve_schema_test";
-    std::error_code ec;
-    std::filesystem::remove_all(root, ec);
+    std::error_code errCode;
+    std::filesystem::remove_all(root, errCode);
 
-    TestDirs dirs{root / "sources", root / "cache-home"};
+    TestDirs dirs{.sources = root / "sources", .cacheHome = root / "cache-home"};
     setEnv("PARSEX_SCHEMA_DIR", dirs.sources.string());
     setEnv("XDG_CACHE_HOME", dirs.cacheHome.string());
 
-    std::filesystem::create_directories(dirs.sources, ec);
+    std::filesystem::create_directories(dirs.sources, errCode);
     std::filesystem::copy_file(
         std::filesystem::path(PARSEX_FIXTURE_DIR) / "mini_test_schema.xsd",
         dirs.sources / (release + ".xsd"));
@@ -89,8 +92,8 @@ TestDirs makeIsolatedDirs(const std::string& release) {
 }
 
 std::string readFileBytes(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    std::ifstream input(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
 }
 
 }  // namespace
@@ -116,8 +119,8 @@ TEST(ResolveSchemaTest, FirstCallIsCacheMissSecondIsHit) {
     EXPECT_NE(hit.schema.schemaHandle, nullptr);
     EXPECT_EQ(hit.schema.sourceXsdPath, cached);
 
-    std::error_code ec;
-    std::filesystem::remove_all(dirs.sources.parent_path(), ec);
+    std::error_code errCode;
+    std::filesystem::remove_all(dirs.sources.parent_path(), errCode);
 }
 
 TEST(ResolveSchemaTest, TelemetryTimedWhenNonNullFreeWhenNull) {
@@ -128,26 +131,24 @@ TEST(ResolveSchemaTest, TelemetryTimedWhenNonNullFreeWhenNull) {
     const SchemaResolutionResult result = resolveSchema("mini-test", &telemetry);
     EXPECT_NE(result.schema.schemaHandle, nullptr);
     ASSERT_EQ(telemetry.samples.size(), 1U);
-    EXPECT_EQ(telemetry.samples[0].name, "SchemaRegistry.resolveSchema");
-    EXPECT_GE(telemetry.samples[0].elapsed.count(), 0);
+    EXPECT_EQ(telemetry.samples.at(0).name, "SchemaRegistry.resolveSchema");
+    EXPECT_GE(telemetry.samples.at(0).elapsed.count(), 0);
 
     // Nullptr costs nothing and still resolves.
     const SchemaResolutionResult plain = resolveSchema("mini-test", nullptr);
     EXPECT_TRUE(plain.wasCacheHit);
     EXPECT_NE(plain.schema.schemaHandle, nullptr);
 
-    std::error_code ec;
-    std::filesystem::remove_all(dirs.sources.parent_path(), ec);
+    std::error_code errCode;
+    std::filesystem::remove_all(dirs.sources.parent_path(), errCode);
 }
 
 TEST(ResolveSchemaTest, UnsupportedReleaseThrows) {
     EnvGuard guard;
     TestDirs dirs = makeIsolatedDirs("mini-test");
 
-    // Interim std::runtime_error; the error-handling subtask replaces this
-    // with the dedicated SchemaResolutionError.
-    EXPECT_THROW(resolveSchema("no-such-release"), std::runtime_error);
+    EXPECT_THROW(resolveSchema("no-such-release"), SchemaResolutionError);
 
-    std::error_code ec;
-    std::filesystem::remove_all(dirs.sources.parent_path(), ec);
+    std::error_code errCode;
+    std::filesystem::remove_all(dirs.sources.parent_path(), errCode);
 }

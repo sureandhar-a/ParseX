@@ -2,6 +2,7 @@
 
 #include <parsex/schema/atomic_write.hpp>
 #include <parsex/schema/cache_layout.hpp>
+#include <parsex/schema/schema_resolution_error.hpp>
 #include <parsex/schema/xml_schema_raii.hpp>
 #include <parsex/telemetry/operation_telemetry.hpp>
 
@@ -47,14 +48,18 @@ void onParseWarning(void* ctx, const char* msg, ...) {
     (void)msg;
 }
 
-std::string readFileBytes(const std::filesystem::path& path) {
+std::string readFileBytes(const std::filesystem::path& path, const std::string& release) {
     std::ifstream input(path, std::ios::binary);
     if (!input) {
-        throw std::runtime_error("resolveSchema: cannot open file: " + path.string());
+        throw SchemaResolutionError(
+            release, SchemaResolutionReason::SchemaFileMissing,
+            "cannot open file: " + path.string());
     }
     std::string bytes{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
     if (input.bad()) {
-        throw std::runtime_error("resolveSchema: error reading file: " + path.string());
+        throw SchemaResolutionError(
+            release, SchemaResolutionReason::SchemaFileMissing,
+            "error reading file: " + path.string());
     }
     return bytes;
 }
@@ -64,27 +69,30 @@ std::string narrowUtf8(const std::filesystem::path& path) {
     return {utf8.begin(), utf8.end()};
 }
 
-XmlSchemaPtr parseSchemaFile(const std::filesystem::path& xsdPath) {
+XmlSchemaPtr parseSchemaFile(const std::filesystem::path& xsdPath, const std::string& release) {
     const std::string narrow = narrowUtf8(xsdPath);
     ParseLog log;
     XmlSchemaParserCtxtPtr parserCtxt{xmlSchemaNewParserCtxt(narrow.c_str())};
     if (parserCtxt == nullptr) {
-        throw std::runtime_error(
-            "resolveSchema: cannot create schema parser context for: " + xsdPath.string());
+        throw SchemaResolutionError(
+            release, SchemaResolutionReason::SchemaFileCorrupt,
+            "cannot create schema parser context for: " + xsdPath.string());
     }
     xmlSchemaSetParserErrors(parserCtxt.get(), onParseError, onParseWarning, &log);
     XmlSchemaPtr schema{xmlSchemaParse(parserCtxt.get())};
     if (schema == nullptr) {
-        throw std::runtime_error(
-            "resolveSchema: cannot parse schema: " + xsdPath.string() +
-            (log.firstError.empty() ? "" : " (" + log.firstError + ")"));
+        throw SchemaResolutionError(
+            release, SchemaResolutionReason::SchemaFileCorrupt,
+            "cannot parse schema: " + xsdPath.string() +
+                (log.firstError.empty() ? "" : " (" + log.firstError + ")"));
     }
     return schema;
 }
 
 // First <release>.xsd found wins: $PARSEX_SCHEMA_DIR, then the baked install
-// default, then the source tree (dev convenience). Throws when no source has
-// the release. (Interim std::runtime_error; SchemaResolutionError next.)
+// default, then the source tree (dev convenience). Throws
+// UnsupportedRelease when no source has the release — the expected, common
+// failure mode (typo'd or genuinely unsupported release string).
 std::filesystem::path findSourceFile(const std::string& release) {
     const std::string filename = release + ".xsd";
     if (const char* env = std::getenv("PARSEX_SCHEMA_DIR"); env != nullptr && *env != '\0') {
@@ -101,9 +109,11 @@ std::filesystem::path findSourceFile(const std::string& release) {
             return candidate;
         }
     }
-    throw std::runtime_error(
-        "resolveSchema: unsupported AUTOSAR release: '" + release +
-        "' (no " + filename + " in schema sources; see resources/schemas/README.md)");
+    throw SchemaResolutionError(
+        release, SchemaResolutionReason::UnsupportedRelease,
+        "no " + filename +
+            " in schema sources ($PARSEX_SCHEMA_DIR, install default, source tree); "
+            "see resources/schemas/README.md");
 }
 
 }  // namespace
@@ -118,18 +128,30 @@ SchemaResolutionResult resolveSchema(const std::string& release, OperationTeleme
     // the cache on a hit, the user-supplied source on a miss (the bytes are
     // identical — the miss path copies them into the cache first).
     std::filesystem::path originPath;
+    std::filesystem::path parsePath;
     if (!hit) {
         const std::filesystem::path sourcePath = findSourceFile(release);
-        writeCacheAtomically(cachePath, readFileBytes(sourcePath));
         originPath = sourcePath;
+        try {
+            writeCacheAtomically(cachePath, readFileBytes(sourcePath, release));
+            parsePath = cachePath;
+        } catch (const std::exception&) {
+            // The cache is a performance optimization, not a correctness
+            // requirement — the source is always ground truth. A cache-write
+            // failure (read-only home, full disk) degrades gracefully to
+            // parsing the source directly instead of failing the operation.
+            // (No logging infra exists yet — hook a warning here when it does.)
+            parsePath = sourcePath;
+        }
     } else {
         originPath = cachePath;
+        parsePath = cachePath;
     }
 
     XmlSchemaPtr parsed;
     {
         ScopedTimer timer(telemetry, "SchemaRegistry.resolveSchema");
-        parsed = parseSchemaFile(cachePath);
+        parsed = parseSchemaFile(parsePath, release);
     }
 
     CachedSchema schema;

@@ -42,6 +42,8 @@ public:
     }
     EnvGuard(const EnvGuard&) = delete;
     EnvGuard& operator=(const EnvGuard&) = delete;
+    EnvGuard(EnvGuard&&) noexcept = default;
+    EnvGuard& operator=(EnvGuard&&) noexcept = default;
 
 private:
     static std::optional<std::string> readEnv(const char* name) {
@@ -71,8 +73,8 @@ std::filesystem::path testScratchDir() {
 TEST(CacheLayoutTest, UsesXdgCacheHomeWhenSet) {
     const EnvGuard guard;
     const auto scratch = testScratchDir();
-    std::error_code ec;
-    std::filesystem::remove_all(scratch, ec);
+    std::error_code errCode;
+    std::filesystem::remove_all(scratch, errCode);
 
     setEnv("XDG_CACHE_HOME", scratch.string());
     const auto dir = getCacheDirectory();
@@ -80,14 +82,14 @@ TEST(CacheLayoutTest, UsesXdgCacheHomeWhenSet) {
     EXPECT_EQ(dir, scratch / "parsex" / "schemas");
     EXPECT_TRUE(std::filesystem::is_directory(dir));
 
-    std::filesystem::remove_all(scratch, ec);
+    std::filesystem::remove_all(scratch, errCode);
 }
 
 TEST(CacheLayoutTest, FallsBackToHomeDotCache) {
     const EnvGuard guard;
     const auto fakeHome = testScratchDir() / "home";
-    std::error_code ec;
-    std::filesystem::remove_all(testScratchDir(), ec);
+    std::error_code errCode;
+    std::filesystem::remove_all(testScratchDir(), errCode);
 
     unsetEnv("XDG_CACHE_HOME");
     setEnv("HOME", fakeHome.string());
@@ -96,14 +98,14 @@ TEST(CacheLayoutTest, FallsBackToHomeDotCache) {
     EXPECT_EQ(dir, fakeHome / ".cache" / "parsex" / "schemas");
     EXPECT_TRUE(std::filesystem::is_directory(dir));
 
-    std::filesystem::remove_all(testScratchDir(), ec);
+    std::filesystem::remove_all(testScratchDir(), errCode);
 }
 
 TEST(CacheLayoutTest, CachePathForBuildsPerReleaseFileName) {
     const EnvGuard guard;
     const auto scratch = testScratchDir();
-    std::error_code ec;
-    std::filesystem::remove_all(scratch, ec);
+    std::error_code errCode;
+    std::filesystem::remove_all(scratch, errCode);
 
     setEnv("XDG_CACHE_HOME", scratch.string());
 
@@ -111,5 +113,5 @@ TEST(CacheLayoutTest, CachePathForBuildsPerReleaseFileName) {
     EXPECT_EQ(cachePathFor("R21-11"), scratch / "parsex" / "schemas" / "R21-11.xsd.cache");
     EXPECT_EQ(cachePathFor("R21-11").parent_path(), getCacheDirectory());
 
-    std::filesystem::remove_all(scratch, ec);
+    std::filesystem::remove_all(scratch, errCode);
 }

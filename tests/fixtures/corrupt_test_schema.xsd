@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Deliberately corrupted schema for error-path tests: truncated mid-tag so
+     libxml2's schema parser fails on it. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"><xs:element
