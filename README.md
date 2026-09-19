@@ -13,7 +13,26 @@ This is required because vcpkg uses `pkg-config` during dependency configuration
 
 ## Build
 
+Using the CMake preset:
+
 ```bash
-cmake -B build -S .
-cmake --build build
+cmake --preset default
+cmake --build --preset default
 ```
+
+Run tests with the preset:
+
+```bash
+ctest --preset default
+```
+
+You can also build the release preset:
+
+```bash
+cmake --preset release
+cmake --build --preset release
+```
+
+## Documentation
+
+- [Shared types module reference](docs/shared-types.md) — the domain types, containers, and protocol-extension variant: which file to open for what.

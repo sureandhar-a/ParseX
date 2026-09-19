@@ -3,6 +3,12 @@ add_executable(include_tests
     parsex/raw/raw_span_test.cpp # RawSpan unit test source file
     parsex/raw/raw_document_test.cpp # RawDocument unit test
     parsex/raw/raw_node_test.cpp # RawDocument unit test
+    parsex/model/protocol_specific_test.cpp # ProtocolSpecific unit test
+    parsex/model/cluster_test.cpp # Cluster and EcuInstance model tests
+    parsex/model/ecu_instance_test.cpp # Cluster and EcuInstance model tests
+    parsex/model/frame_test.cpp # Frame model test
+    parsex/model/pdu_test.cpp # Pdu model test
+    parsex/model/signal_test.cpp # Signal model test
 )
 # Link the test binary to the project library and GoogleTest.
 target_link_libraries(
