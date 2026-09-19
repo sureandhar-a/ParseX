@@ -1,4 +1,5 @@
 #include <parsex/schema/atomic_write.hpp>
+#include <parsex/schema/detail/atomic_write_detail.hpp>
 
 #include <algorithm>
 #include <cerrno>
@@ -119,26 +120,10 @@ void writeCacheAtomically(const std::filesystem::path& path, const std::string& 
     }
 
     const std::filesystem::path tmp =
-        dir / (path.filename().string() + ".tmp." + randomHexSuffix());
+        detail::makeTmpPath(dir, path.filename().string());
     TmpCleanup cleanup(tmp);
 
-    const int fd = portableOpen(tmp);
-    if (fd < 0) {
-        throwErrno(tmp, "writeCacheAtomically: open");
-    }
-    if (!portableWriteFull(fd, data)) {
-        const int writeErr = errno;
-        portableClose(fd);
-        errno = writeErr;
-        throwErrno(tmp, "writeCacheAtomically: write");
-    }
-    if (!portableSync(fd)) {
-        const int syncErr = errno;
-        portableClose(fd);
-        errno = syncErr;
-        throwErrno(tmp, "writeCacheAtomically: fsync");
-    }
-    portableClose(fd);
+    detail::writeTmpFileSync(tmp, data);
 
     // Atomic on POSIX when tmp and path share a filesystem (same directory
     // guarantees it); replaces any existing entry atomically.
@@ -148,3 +133,32 @@ void writeCacheAtomically(const std::filesystem::path& path, const std::string& 
     }
     cleanup.disarm();
 }
+
+namespace detail {
+
+std::filesystem::path makeTmpPath(
+    const std::filesystem::path& dir, const std::string& filename) {
+    return dir / (filename + ".tmp." + randomHexSuffix());
+}
+
+void writeTmpFileSync(const std::filesystem::path& tmpPath, const std::string& data) {
+    const int fd = portableOpen(tmpPath);
+    if (fd < 0) {
+        throwErrno(tmpPath, "writeTmpFileSync: open");
+    }
+    if (!portableWriteFull(fd, data)) {
+        const int writeErr = errno;
+        portableClose(fd);
+        errno = writeErr;
+        throwErrno(tmpPath, "writeTmpFileSync: write");
+    }
+    if (!portableSync(fd)) {
+        const int syncErr = errno;
+        portableClose(fd);
+        errno = syncErr;
+        throwErrno(tmpPath, "writeTmpFileSync: fsync");
+    }
+    portableClose(fd);
+}
+
+}  // namespace detail
