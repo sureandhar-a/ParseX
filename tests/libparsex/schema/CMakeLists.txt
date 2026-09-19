@@ -3,6 +3,7 @@ add_executable(schema_tests
     cached_schema_test.cpp
     xml_schema_raii_test.cpp
     cache_layout_test.cpp
+    atomic_write_test.cpp
 )
 target_link_libraries(
     schema_tests
