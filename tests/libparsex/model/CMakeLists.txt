@@ -1,6 +1,7 @@
 # Model defaults checklist: one place listing every field default in the module.
 add_executable(model_tests
-    defaults_test.cpp # consolidated Parser data-model defaults (cf. docs/lld.md)
+    defaults_test.cpp
+    shared_types_integration_test.cpp
 )
 target_link_libraries(
     model_tests
@@ -8,5 +9,10 @@ target_link_libraries(
     libparsex
     GTest::gtest
     GTest::gtest_main
+)
+target_compile_definitions(
+    model_tests
+    PRIVATE
+    PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
 )
 gtest_discover_tests(model_tests)
