@@ -1,10 +1,17 @@
 # Define the static library target and add source files
-add_library(libparsex STATIC src/version.cpp)
+add_library(libparsex STATIC
+    src/version.cpp
+    src/cache_layout.cpp
+)
 
 # Tell targets linking against libparsex where to find its header files
 target_include_directories(libparsex PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_include_directories(libparsex INTERFACE include)
+
+# The library's own sources also include <parsex/...> (INTERFACE above only
+# applies to consumers).
+target_include_directories(libparsex PRIVATE include)
 
 
 find_package(LibXml2 REQUIRED)
