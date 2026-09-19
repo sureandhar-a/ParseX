@@ -32,3 +32,7 @@ You can also build the release preset:
 cmake --preset release
 cmake --build --preset release
 ```
+
+## Documentation
+
+- [Shared types module reference](docs/shared-types.md) — the domain types, containers, and protocol-extension variant: which file to open for what.
