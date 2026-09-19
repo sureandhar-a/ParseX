@@ -1,5 +1,7 @@
+#pragma once
+
 #include <string>
-#include <raw_span.hpp>
+#include <parsex/raw/raw_span.hpp>
 #include <optional>
 
 struct CommonFields {

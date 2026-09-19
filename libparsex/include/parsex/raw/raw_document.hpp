@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 #include <libxml/tree.h>
 #include "raw_node.hpp"

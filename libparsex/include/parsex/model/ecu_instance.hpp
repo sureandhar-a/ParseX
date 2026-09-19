@@ -6,8 +6,8 @@
 #include <optional>
 #include <cstdint>
 
-struct Cluster {
+struct EcuInstance {
     CommonFields common;
-    std::optional<std::uint32_t> baudrate;
-    std::vector<std::string> physicalChannels;
+    std::vector<std::string> connectedChannels;
+    std::vector<std::string> controllers;
 };
