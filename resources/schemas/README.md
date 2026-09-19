@@ -64,9 +64,14 @@ Steps: download the archive(s) for the release(s) you need, extract the
 `.xsd`, rename it to the lookup key from the table above, and drop it in this
 directory (or any directory you then pass via `--xsd-path` /
 `$PARSEX_SCHEMA_DIR`). Then re-run configure — CMake copies `*.xsd` into the
-build tree and the install output (see root `CMakeLists.txt`). Keep the
-archive's sibling `xml.xsd` (the W3C namespace file the AUTOSAR schema
-imports) alongside until the Schema Registry decides its handling.
+build tree and the install output (see root `CMakeLists.txt`).
+
+`xml.xsd` (committed, W3C-licensed — not AUTOSAR-copyrighted, per the R21-11
+release overview §1.2.2) must sit alongside the schemas: every AUTOSAR XSD
+imports it via relative `schemaLocation="xml.xsd"`, and parsing fails without
+it. The copy here is byte-identical across all six archives that ship it
+(R19-11's archive omits it; the same file applies — the xml namespace is
+version-independent).
 
 Reference (no login needed): the R21-11 release overview PDF lists exact
 schema/version numbers:

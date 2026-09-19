@@ -77,4 +77,7 @@ downloads/
 # AUTOSAR XSD schemas are user-supplied, never committed (see
 # resources/schemas/README.md and docs/decisions/0002-*.md). The directory
 # layout and README are tracked; the copyrighted .xsd files are not.
+# Exception: xml.xsd is W3C-licensed (not AUTOSAR-copyrighted) and required
+# alongside every schema, so it IS committed.
 resources/schemas/*.xsd
+!resources/schemas/xml.xsd
