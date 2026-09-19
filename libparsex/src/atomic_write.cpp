@@ -4,8 +4,9 @@
 #include <algorithm>
 #include <cerrno>
 #include <climits>
-#include <cstdio>
+#include <iomanip>
 #include <random>
+#include <sstream>
 #include <system_error>
 #include <utility>
 
@@ -26,64 +27,66 @@ namespace {
 }
 
 std::string randomHexSuffix() {
-    std::random_device rd;
-    std::mt19937_64 gen(rd());
-    char buf[17];
-    std::snprintf(buf, sizeof(buf), "%016llx",
-                  static_cast<unsigned long long>(gen()));
-    return std::string(buf);
+    std::random_device randomDevice;
+    std::mt19937_64 generator(randomDevice());
+    std::ostringstream out;
+    out << std::hex << std::setw(16) << std::setfill('0') << generator();
+    return out.str();
 }
 
 int portableOpen(const std::filesystem::path& tmp) {
 #ifdef _WIN32
-    int fd = -1;
-    _sopen_s(&fd, tmp.string().c_str(),
+    int fileDesc = -1;
+    _sopen_s(&fileDesc, tmp.string().c_str(),
              _O_WRONLY | _O_CREAT | _O_TRUNC | _O_BINARY, _SH_DENYWR,
              _S_IREAD | _S_IWRITE);
-    return fd;
+    return fileDesc;
 #else
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): open() with a mode argument is inherently variadic.
     return ::open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
 #endif
 }
 
-bool portableWriteFull(int fd, const std::string& data) {
+bool portableWriteFull(int fileDesc, const std::string& data) {
     std::size_t done = 0;
     while (done < data.size()) {
 #ifdef _WIN32
         const int chunk =
             static_cast<int>((std::min)(data.size() - done, std::size_t{INT_MAX}));
-        const int n = ::_write(fd, data.data() + done, static_cast<unsigned>(chunk));
-        if (n < 0) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): fd I/O needs a raw offset pointer.
+        const int writeCount = ::_write(fileDesc, data.data() + done, static_cast<unsigned>(chunk));
+        if (writeCount < 0) {
             return false;
         }
-        done += static_cast<std::size_t>(n);
+        done += static_cast<std::size_t>(writeCount);
 #else
-        const ssize_t n = ::write(fd, data.data() + done, data.size() - done);
-        if (n < 0) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): fd I/O needs a raw offset pointer.
+        const ssize_t writeCount = ::write(fileDesc, data.data() + done, data.size() - done);
+        if (writeCount < 0) {
             if (errno == EINTR) {
                 continue;
             }
             return false;
         }
-        done += static_cast<std::size_t>(n);
+        done += static_cast<std::size_t>(writeCount);
 #endif
     }
     return true;
 }
 
-bool portableSync(int fd) {
+bool portableSync(int fileDesc) {
 #ifdef _WIN32
-    return ::_commit(fd) == 0;
+    return ::_commit(fileDesc) == 0;
 #else
-    return ::fsync(fd) == 0;
+    return ::fsync(fileDesc) == 0;
 #endif
 }
 
-void portableClose(int fd) {
+void portableClose(int fileDesc) {
 #ifdef _WIN32
-    ::_close(fd);
+    ::_close(fileDesc);
 #else
-    ::close(fd);
+    ::close(fileDesc);
 #endif
 }
 
@@ -93,12 +96,14 @@ public:
     explicit TmpCleanup(std::filesystem::path tmp) : tmp_(std::move(tmp)) {}
     ~TmpCleanup() {
         if (armed_) {
-            std::error_code ec;
-            std::filesystem::remove(tmp_, ec);
+            std::error_code removeError;
+            std::filesystem::remove(tmp_, removeError);
         }
     }
     TmpCleanup(const TmpCleanup&) = delete;
     TmpCleanup& operator=(const TmpCleanup&) = delete;
+    TmpCleanup(TmpCleanup&&) noexcept = default;
+    TmpCleanup& operator=(TmpCleanup&&) noexcept = default;
     void disarm() { armed_ = false; }
 
 private:
@@ -113,10 +118,10 @@ void writeCacheAtomically(const std::filesystem::path& path, const std::string& 
     if (dir.empty()) {
         dir = ".";
     }
-    std::error_code ec;
-    std::filesystem::create_directories(dir, ec);
-    if (ec) {
-        throw std::system_error(ec, "writeCacheAtomically: create_directories: " + dir.string());
+    std::error_code dirError;
+    std::filesystem::create_directories(dir, dirError);
+    if (dirError) {
+        throw std::system_error(dirError, "writeCacheAtomically: create_directories: " + dir.string());
     }
 
     const std::filesystem::path tmp =
@@ -127,9 +132,9 @@ void writeCacheAtomically(const std::filesystem::path& path, const std::string& 
 
     // Atomic on POSIX when tmp and path share a filesystem (same directory
     // guarantees it); replaces any existing entry atomically.
-    std::filesystem::rename(tmp, path, ec);
-    if (ec) {
-        throw std::system_error(ec, "writeCacheAtomically: rename: " + tmp.string());
+    std::filesystem::rename(tmp, path, dirError);
+    if (dirError) {
+        throw std::system_error(dirError, "writeCacheAtomically: rename: " + tmp.string());
     }
     cleanup.disarm();
 }
@@ -142,23 +147,23 @@ std::filesystem::path makeTmpPath(
 }
 
 void writeTmpFileSync(const std::filesystem::path& tmpPath, const std::string& data) {
-    const int fd = portableOpen(tmpPath);
-    if (fd < 0) {
+    const int fileDesc = portableOpen(tmpPath);
+    if (fileDesc < 0) {
         throwErrno(tmpPath, "writeTmpFileSync: open");
     }
-    if (!portableWriteFull(fd, data)) {
+    if (!portableWriteFull(fileDesc, data)) {
         const int writeErr = errno;
-        portableClose(fd);
+        portableClose(fileDesc);
         errno = writeErr;
         throwErrno(tmpPath, "writeTmpFileSync: write");
     }
-    if (!portableSync(fd)) {
+    if (!portableSync(fileDesc)) {
         const int syncErr = errno;
-        portableClose(fd);
+        portableClose(fileDesc);
         errno = syncErr;
         throwErrno(tmpPath, "writeTmpFileSync: fsync");
     }
-    portableClose(fd);
+    portableClose(fileDesc);
 }
 
 }  // namespace detail

@@ -5,6 +5,7 @@ add_executable(schema_tests
     cache_layout_test.cpp
     atomic_write_test.cpp
     cache_atomicity_test.cpp
+    resolve_schema_test.cpp
 )
 target_link_libraries(
     schema_tests
@@ -18,5 +19,11 @@ target_compile_definitions(
     schema_tests
     PRIVATE
     PARSEX_SCHEMA_DIR="${CMAKE_SOURCE_DIR}/resources/schemas"
+)
+# Shared fixtures dir (see tests/fixtures/).
+target_compile_definitions(
+    schema_tests
+    PRIVATE
+    PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
 )
 gtest_discover_tests(schema_tests)

@@ -14,8 +14,8 @@ std::filesystem::path getCacheDirectory() {
     }
 
     const std::filesystem::path dir = base / "parsex" / "schemas";
-    std::error_code ec;
-    std::filesystem::create_directories(dir, ec);
+    std::error_code dirError;
+    std::filesystem::create_directories(dir, dirError);
     return dir;
 }
 
