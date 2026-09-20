@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 
+#include <parsex/model/common_fields.hpp>
 #include <parsex/model/signal.hpp>
 #include <parsex/parser/loader.hpp>
 #include <parsex/parser/model_builder.hpp>
@@ -24,6 +25,16 @@ std::string trimCopy(const std::string& text) {
         return "";
     }
     return text.substr(first, text.find_last_not_of(" \t\r\n") - first + 1);
+}
+
+// shortName + category + rawSpanRef come through the shared populateCommonFields
+// helper: assert the whole triple for one instance of each domain type.
+void expectCommon(const CommonFields& common, const RawNode& node,
+                  const std::string& shortName,
+                  const std::optional<std::string>& category) {
+    EXPECT_EQ(common.shortName, shortName);
+    EXPECT_EQ(common.category, category);
+    EXPECT_EQ(common.rawSpanRef, node.span);
 }
 
 std::string directText(const RawNode& node, const std::string& tag) {
@@ -86,9 +97,7 @@ TEST_F(ModelBuilderTinyTest, Cluster) {
     const RawNode* node = findElement(doc().root, "CLUSTER");
     ASSERT_NE(node, nullptr);
     const Cluster cluster = buildCluster(*node);
-    EXPECT_EQ(cluster.common.shortName, "CAN_Cluster");
-    EXPECT_EQ(cluster.common.category, std::optional<std::string>("CAN"));
-    EXPECT_EQ(cluster.common.rawSpanRef, node->span);
+    expectCommon(cluster.common, *node, "CAN_Cluster", std::optional<std::string>("CAN"));
     EXPECT_EQ(cluster.baudrate, std::optional<std::uint32_t>(500000U));
     EXPECT_EQ(cluster.physicalChannels, std::vector<std::string>{"can0"});
 }
@@ -97,8 +106,7 @@ TEST_F(ModelBuilderRealTest, Cluster) {
     const RawNode* node = findNamed(doc().root, "CAN-CLUSTER", "Cluster0");
     ASSERT_NE(node, nullptr);
     const Cluster cluster = buildCluster(*node);
-    EXPECT_EQ(cluster.common.shortName, "Cluster0");
-    EXPECT_EQ(cluster.common.category, std::nullopt);
+    expectCommon(cluster.common, *node, "Cluster0", std::nullopt);
     EXPECT_EQ(cluster.baudrate, std::optional<std::uint32_t>(500000U));
     // Nested CAN-PHYSICAL-CHANNEL under CAN-CLUSTER-CONDITIONAL — and only
     // the channel's own SHORT-NAME, not the triggerings' nested ones.
@@ -109,7 +117,7 @@ TEST_F(ModelBuilderTinyTest, EcuInstance) {
     const RawNode* node = findNamed(doc().root, "ECU-INSTANCE", "ECU_A");
     ASSERT_NE(node, nullptr);
     const EcuInstance ecu = buildEcuInstance(*node);
-    EXPECT_EQ(ecu.common.shortName, "ECU_A");
+    expectCommon(ecu.common, *node, "ECU_A", std::optional<std::string>("ECU"));
     EXPECT_EQ(ecu.connectedChannels, std::vector<std::string>{"can0"});
     EXPECT_EQ(ecu.controllers, std::vector<std::string>{"CanCtrl_1"});
 }
@@ -118,7 +126,7 @@ TEST_F(ModelBuilderRealTest, EcuInstance) {
     const RawNode* node = findNamed(doc().root, "ECU-INSTANCE", "DJ");
     ASSERT_NE(node, nullptr);
     const EcuInstance ecu = buildEcuInstance(*node);
-    EXPECT_EQ(ecu.common.shortName, "DJ");
+    expectCommon(ecu.common, *node, "DJ", std::nullopt);
     // No CONNECTED-CHANNELS on a system-template ECU-INSTANCE (only
     // ASSOCIATED-COM-I-PDU-GROUP-REFS, which are PDU groups, not channels).
     EXPECT_TRUE(ecu.connectedChannels.empty());
@@ -129,7 +137,7 @@ TEST_F(ModelBuilderTinyTest, Frame) {
     const RawNode* node = findNamed(doc().root, "FRAME", "Frame_1");
     ASSERT_NE(node, nullptr);
     const Frame frame = buildFrame(*node);
-    EXPECT_EQ(frame.common.shortName, "Frame_1");
+    expectCommon(frame.common, *node, "Frame_1", std::nullopt);
     EXPECT_EQ(frame.length, 8U);
     EXPECT_EQ(frame.transmitters, std::vector<std::string>{"ECU_A"});
     ASSERT_EQ(frame.pdus.size(), 1U);
@@ -141,7 +149,7 @@ TEST_F(ModelBuilderRealTest, Frame) {
     const RawNode* node = findNamed(doc().root, "CAN-FRAME", "MultiplexedMessage");
     ASSERT_NE(node, nullptr);
     const Frame frame = buildFrame(*node);
-    EXPECT_EQ(frame.common.shortName, "MultiplexedMessage");
+    expectCommon(frame.common, *node, "MultiplexedMessage", std::nullopt);
     EXPECT_EQ(frame.length, 2U);
     // No TRANSMITTERS on a CAN-FRAME node — senders live behind
     // FRAME-TRIGGERINGs, joined at project level later.
@@ -155,7 +163,7 @@ TEST_F(ModelBuilderTinyTest, Pdu) {
     const RawNode* node = findNamed(doc().root, "PDU", "Pdu_1");
     ASSERT_NE(node, nullptr);
     const Pdu pdu = buildPdu(*node);
-    EXPECT_EQ(pdu.common.shortName, "Pdu_1");
+    expectCommon(pdu.common, *node, "Pdu_1", std::nullopt);
     EXPECT_EQ(pdu.length, 8U);
     ASSERT_EQ(pdu.signalMappings.size(), 1U);
     EXPECT_EQ(pdu.signalMappings.at(0).signalShortNameRef, "Signal_1");
@@ -167,7 +175,7 @@ TEST_F(ModelBuilderRealTest, Pdu) {
     const RawNode* node = findNamed(doc().root, "I-SIGNAL-I-PDU", "multiplexed_message_static");
     ASSERT_NE(node, nullptr);
     const Pdu pdu = buildPdu(*node);
-    EXPECT_EQ(pdu.common.shortName, "multiplexed_message_static");
+    expectCommon(pdu.common, *node, "multiplexed_message_static", std::nullopt);
     EXPECT_EQ(pdu.length, 8U);
     ASSERT_EQ(pdu.signalMappings.size(), 2U);
     EXPECT_EQ(pdu.signalMappings.at(0).signalShortNameRef, "MultiplexedStatic");
@@ -183,7 +191,7 @@ TEST_F(ModelBuilderTinyTest, Signal) {
     const RawNode* node = findNamed(doc().root, "SYSTEM-SIGNAL", "Signal_1");
     ASSERT_NE(node, nullptr);
     const Signal signal = buildSignal(*node);
-    EXPECT_EQ(signal.common.shortName, "Signal_1");
+    expectCommon(signal.common, *node, "Signal_1", std::nullopt);
     EXPECT_EQ(signal.startBit, 0U);
     EXPECT_EQ(signal.bitLength, 16U);
     EXPECT_EQ(signal.byteOrder, ByteOrder::MostSignificantByteFirst);
@@ -208,7 +216,7 @@ TEST_F(ModelBuilderRealTest, Signal) {
     const RawNode* node = findNamed(doc().root, "I-SIGNAL", "MultiplexedStatic");
     ASSERT_NE(node, nullptr);
     const Signal signal = buildSignal(*node);
-    EXPECT_EQ(signal.common.shortName, "MultiplexedStatic");
+    expectCommon(signal.common, *node, "MultiplexedStatic", std::nullopt);
     // Packing lives on the owning PDU's I-SIGNAL-TO-I-PDU-MAPPING (captured
     // in PduSignalMapping instead) — the node itself carries none.
     EXPECT_EQ(signal.startBit, 0U);
@@ -217,14 +225,13 @@ TEST_F(ModelBuilderRealTest, Signal) {
     EXPECT_EQ(signal.initValue, std::optional<double>(7.0));
     EXPECT_TRUE(signal.receivers.empty());
     EXPECT_EQ(signal.valueTable, std::nullopt);
-    EXPECT_EQ(signal.common.rawSpanRef, node->span);
 }
 
 TEST_F(ModelBuilderTinyTest, SignalGroup) {
     const RawNode* node = findNamed(doc().root, "SIGNAL-GROUP", "SignalGroup_1");
     ASSERT_NE(node, nullptr);
     const SignalGroup group = buildSignalGroup(*node);
-    EXPECT_EQ(group.common.shortName, "SignalGroup_1");
+    expectCommon(group.common, *node, "SignalGroup_1", std::nullopt);
     EXPECT_EQ(group.members, std::vector<std::string>{"Signal_1"});
 }
 
@@ -232,7 +239,7 @@ TEST_F(ModelBuilderRealTest, SignalGroup) {
     const RawNode* node = findNamed(doc().root, "I-SIGNAL-GROUP", "message1Group");
     ASSERT_NE(node, nullptr);
     const SignalGroup group = buildSignalGroup(*node);
-    EXPECT_EQ(group.common.shortName, "message1Group");
+    expectCommon(group.common, *node, "message1Group", std::nullopt);
     EXPECT_EQ(group.members,
               std::vector<std::string>({"signal1", "signal5", "signal6"}));
 }

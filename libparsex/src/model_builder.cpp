@@ -174,14 +174,25 @@ bool isSignedBaseType(const std::string& baseTypeRef) {
     return name.size() >= 2 && name.at(0) == 'S' && name.at(1) >= '0' && name.at(1) <= '9';
 }
 
-CommonFields makeCommon(const RawNode& node) {
-    CommonFields common;
+// Universal AUTOSAR convention: essentially every named element carries its
+// name in a SHORT-NAME child. Missing (malformed input) yields "" —
+// best-effort parsing leaves conformance to the Validator.
+std::string extractShortName(const RawNode& node) {
     const std::optional<std::string> shortName = childText(node, "SHORT-NAME");
-    common.shortName = shortName.has_value() ? shortName.value() : "";
+    return shortName.has_value() ? shortName.value() : "";
+}
+
+// Single shared population point for the composed CommonFields block (same
+// "one place to change" reasoning as CommonFields itself being shared).
+CommonFields populateCommonFields(const RawNode& node) {
+    CommonFields common;
+    common.shortName = extractShortName(node);
     const std::optional<std::string> category = childText(node, "CATEGORY");
     if (category.has_value()) {
         common.category = category.value();
     }
+    // No XML reading here: the Loader already computed this span, and this
+    // copy is the back-reference the Write Engine will splice through later.
     common.rawSpanRef = node.span;
     return common;
 }
@@ -243,7 +254,7 @@ std::uint32_t childUint32(const RawNode& node, const std::string& tag, std::uint
 
 Cluster buildCluster(const RawNode& node) {
     Cluster cluster;
-    cluster.common = makeCommon(node);
+    cluster.common = populateCommonFields(node);
     // Flat BAUDRATE (study vocabulary) or nested under CAN-CLUSTER-VARIANTS /
     // CAN-CLUSTER-CONDITIONAL (real vocabulary) — first hit wins.
     std::optional<std::string> baudrate = childText(node, "BAUDRATE");
@@ -265,7 +276,7 @@ Cluster buildCluster(const RawNode& node) {
 
 EcuInstance buildEcuInstance(const RawNode& node) {
     EcuInstance ecu;
-    ecu.common = makeCommon(node);
+    ecu.common = populateCommonFields(node);
     ecu.connectedChannels = refShortNames(node, "CHANNEL-REF");
     ecu.controllers = controllerShortNames(node);
     return ecu;
@@ -273,7 +284,7 @@ EcuInstance buildEcuInstance(const RawNode& node) {
 
 Frame buildFrame(const RawNode& node) {
     Frame frame;
-    frame.common = makeCommon(node);
+    frame.common = populateCommonFields(node);
     frame.length = childUint32(node, "LENGTH", childUint32(node, "FRAME-LENGTH", 0));
     frame.transmitters = refShortNames(node, "TRANSMITTER-REF");
     for (const auto& tags : {findDescendants(node, "FRAME-PDU"),
@@ -291,7 +302,7 @@ Frame buildFrame(const RawNode& node) {
 
 Pdu buildPdu(const RawNode& node) {
     Pdu pdu;
-    pdu.common = makeCommon(node);
+    pdu.common = populateCommonFields(node);
     pdu.length = childUint32(node, "LENGTH", 0);
     for (const auto& tags : {findDescendants(node, "PDU-SIGNAL-MAPPING"),
                              findDescendants(node, "I-SIGNAL-TO-I-PDU-MAPPING"),}) {
@@ -319,7 +330,7 @@ Pdu buildPdu(const RawNode& node) {
 
 Signal buildSignal(const RawNode& node) {
     Signal signal;
-    signal.common = makeCommon(node);
+    signal.common = populateCommonFields(node);
     signal.startBit = childUint32(node, "START-BIT", 0);
     // SYSTEM-SIGNAL carries BIT-LENGTH; I-SIGNAL carries LENGTH instead.
     signal.bitLength = childUint32(node, "BIT-LENGTH", childUint32(node, "LENGTH", 0));
@@ -365,7 +376,7 @@ Signal buildSignal(const RawNode& node) {
 
 SignalGroup buildSignalGroup(const RawNode& node) {
     SignalGroup group;
-    group.common = makeCommon(node);
+    group.common = populateCommonFields(node);
     // Real vocabulary references I-SIGNALs; the study vocabulary references
     // SYSTEM-SIGNALs — both reduce to short names uniformly.
     std::vector<std::string> members = refShortNames(node, "I-SIGNAL-REF");
