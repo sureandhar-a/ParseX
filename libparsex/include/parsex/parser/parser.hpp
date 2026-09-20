@@ -41,8 +41,13 @@ public:
     // level, deduped) of each entry point's directory; LazyOnReference pulls
     // in only files that define referenced-but-undefined short names
     // (recursive search, capped fixpoint — see FileDiscoveryMode).
-    // Cross-file reference resolution is a later subtask — resolvedRefs
-    // stays empty in all modes.
+    //
+    // Every mode ends with the same final step: resolving each *ShortNameRef
+    // field against the project's domain objects into resolvedRefs (site keys
+    // read "<Owner>.<field>[<index>]"), and throwing DanglingFileReferenceError
+    // for anything still missing. So a lazily-completed project always passes
+    // this check; ExplicitList/DirectoryScan projects with dangling refs fail
+    // here instead of silently carrying them.
     //
     // Whole-call failure (v1 default, documented choice): if any single file
     // fails, its exception propagates and the entire call fails. A project

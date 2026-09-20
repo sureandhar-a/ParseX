@@ -16,8 +16,9 @@
 class DanglingFileReferenceError : public std::runtime_error {
 public:
     DanglingFileReferenceError(std::vector<std::string> refs,
-                               std::vector<std::filesystem::path> searchedDirs)
-        : std::runtime_error(buildMessage(refs, searchedDirs)),
+                               std::vector<std::filesystem::path> searchedDirs,
+                               std::string context = {})
+        : std::runtime_error(buildMessage(refs, searchedDirs, context)),
           refs_(std::move(refs)),
           searchedDirs_(std::move(searchedDirs)) {}
 
@@ -28,7 +29,8 @@ public:
 
 private:
     static std::string buildMessage(const std::vector<std::string>& refs,
-                                    const std::vector<std::filesystem::path>& dirs) {
+                                    const std::vector<std::filesystem::path>& dirs,
+                                    const std::string& context) {
         std::string message = "parsex: dangling file reference(s): ";
         for (std::size_t idx = 0; idx < refs.size(); ++idx) {
             if (idx > 0) {
@@ -41,7 +43,11 @@ private:
             message += " ";
             message += dir.string();
         }
-        return message + ")";
+        message += ")";
+        if (!context.empty()) {
+            message += " [unresolved sites: " + context + "]";
+        }
+        return message;
     }
 
     std::vector<std::string> refs_;

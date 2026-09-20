@@ -233,6 +233,108 @@ std::filesystem::path normalizePath(const std::filesystem::path& path) {
     return std::filesystem::absolute(path).lexically_normal();
 }
 
+// ---- Final cross-file resolution ----
+//
+// Runs identically at the end of every discovery mode. Builds a per-type
+// index over all domain objects (short name -> defined; first file order
+// wins on same-name collisions — the Validator's future duplicate rule owns
+// those), then records one ResolvedReference per reference site.
+//
+// Site keys read "<OwnerShortName>.<field>[<index>]" (e.g.
+// "Frame_1.pdus[0]"): unique per site, deterministic, human-greppable. Values
+// are the referenced short names verbatim — full AUTOSAR-path tracking is
+// future work (the Builder reduces refs to short names, so paths are not
+// recoverable here); the map's presence per site already proves resolvability.
+//
+// Only the five domain-object-targeting field families participate — the same
+// set LazyOnReference chases, so a lazily-completed project always passes
+// this final check. In particular, refs to existing-but-unbuilt types
+// (MULTIPLEXED-I-PDU, NM-PDU, ...) dangle here by design: only the six built
+// families form the index.
+
+struct UnresolvedSite {
+    std::string key;
+    std::string wanted;
+};
+
+void resolveFileRefs(const ParsedFile& file, const KnownRefs& known,
+                     std::map<std::string, ResolvedReference>& resolved,
+                     std::vector<UnresolvedSite>& unresolved) {
+    const auto resolve = [&](const std::string& key, const std::string& wanted,
+                             const std::set<std::string>& knownNames) {
+        if (wanted.empty()) {
+            return;  // Malformed ref with no target: not file-resolvable.
+        }
+        if (knownNames.contains(wanted)) {
+            resolved.try_emplace(key, ResolvedReference{wanted});
+        } else {
+            unresolved.push_back({.key = key, .wanted = wanted});
+        }
+    };
+    for (const auto& frame : file.frames) {
+        for (std::size_t idx = 0; idx < frame.transmitters.size(); ++idx) {
+            resolve(frame.common.shortName + ".transmitters[" + std::to_string(idx) + "]",
+                    frame.transmitters.at(idx), known.ecus);
+        }
+        for (std::size_t idx = 0; idx < frame.pdus.size(); ++idx) {
+            resolve(frame.common.shortName + ".pdus[" + std::to_string(idx) + "]",
+                    frame.pdus.at(idx).pduShortNameRef, known.pdus);
+        }
+    }
+    for (const auto& pdu : file.pdus) {
+        for (std::size_t idx = 0; idx < pdu.signalMappings.size(); ++idx) {
+            resolve(pdu.common.shortName + ".signalMappings[" + std::to_string(idx) + "]",
+                    pdu.signalMappings.at(idx).signalShortNameRef, known.signals);
+        }
+    }
+    for (const auto& signal : file.signals) {
+        for (std::size_t idx = 0; idx < signal.receivers.size(); ++idx) {
+            resolve(signal.common.shortName + ".receivers[" + std::to_string(idx) + "]",
+                    signal.receivers.at(idx), known.ecus);
+        }
+    }
+    for (const auto& group : file.signalGroups) {
+        for (std::size_t idx = 0; idx < group.members.size(); ++idx) {
+            resolve(group.common.shortName + ".members[" + std::to_string(idx) + "]",
+                    group.members.at(idx), known.signals);
+        }
+    }
+}
+
+void resolveCrossFileReferences(ParsedProject& project) {
+    const KnownRefs known = collectKnownRefs(project);
+    std::map<std::string, ResolvedReference> resolved;
+    std::vector<UnresolvedSite> unresolved;
+    for (const auto& file : project.files) {
+        resolveFileRefs(file, known, resolved, unresolved);
+    }
+    if (!unresolved.empty()) {
+        std::set<std::string> missing;
+        std::string sites;
+        for (const auto& site : unresolved) {
+            missing.insert(site.wanted);
+            if (!sites.empty()) {
+                sites += "; ";
+            }
+            sites += site.key + " -> " + site.wanted;
+        }
+        std::vector<std::filesystem::path> dirs;
+        for (const auto& file : project.files) {
+            std::filesystem::path directory = file.sourcePath.parent_path();
+            if (directory.empty()) {
+                directory = ".";
+            }
+            if (std::ranges::find(dirs, directory) == dirs.end()) {
+                dirs.push_back(directory);
+            }
+        }
+        throw DanglingFileReferenceError(
+            std::vector<std::string>(missing.begin(), missing.end()), std::move(dirs),
+            sites);
+    }
+    project.resolvedRefs = std::move(resolved);
+}
+
 }  // namespace
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static): stateless-by-design instance API — callers write Parser{}.parseFile(...).
@@ -268,6 +370,7 @@ ParsedProject Parser::parseProject(const std::vector<std::filesystem::path>& ent
             // (see header). Partial results are discarded with the project.
             project.files.push_back(parseFile(entry));
         }
+        resolveCrossFileReferences(project);
         return project;
     }
     // DirectoryScan: every .arxml sibling of every entry point (single level,
@@ -292,6 +395,7 @@ ParsedProject Parser::parseProject(const std::vector<std::filesystem::path>& ent
     for (const auto& path : discovered) {
         project.files.push_back(parseFile(path));
     }
+    resolveCrossFileReferences(project);
     return project;
 }
 
@@ -370,12 +474,6 @@ ParsedProject Parser::parseProjectLazy(const std::vector<std::filesystem::path>&
         project.files.push_back(parseFile(entry));
         parsed.insert(normalizePath(entry));
     }
-    std::set<std::filesystem::path> searchDirs;
-    for (const auto& entry : entryPoints) {
-        const std::filesystem::path directory = entry.parent_path();
-        searchDirs.insert(directory.empty() ? std::filesystem::current_path()
-                                            : normalizePath(directory));
-    }
     const std::vector<std::filesystem::path> candidates =
         enumerateCandidates(entryPoints, parsed);
 
@@ -387,10 +485,9 @@ ParsedProject Parser::parseProjectLazy(const std::vector<std::filesystem::path>&
             break;
         }
     }
-    const WantedRefs wanted = collectWantedRefs(project);
-    if (!wanted.empty()) {
-        const std::vector<std::filesystem::path> dirs(searchDirs.begin(), searchDirs.end());
-        throw DanglingFileReferenceError(flattenWanted(wanted), dirs);
-    }
+    // Same final check as every other mode (with per-site details): the
+    // expansion above already threw DanglingFileReferenceError for anything
+    // it could not pull in, so this only ever fires past the iteration cap.
+    resolveCrossFileReferences(project);
     return project;
 }

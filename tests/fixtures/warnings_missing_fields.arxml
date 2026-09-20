@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<AUTOSAR>
+<AUTOSAR xmlns="http://autosar.org/schema/r4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://autosar.org/schema/r4.0 AUTOSAR_00046.xsd">
   <AR-PACKAGES>
     <AR-PACKAGE>
       <SHORT-NAME>WarnPkg</SHORT-NAME>
@@ -35,7 +35,7 @@
           <SHORT-NAME>NoLenPdu</SHORT-NAME>
           <SIGNAL-MAPPINGS>
             <PDU-SIGNAL-MAPPING>
-              <SIGNAL-REF>/WarnPkg/NoBits</SIGNAL-REF>
+              <SIGNAL-REF>/WarnPkg/NoLengthSignal</SIGNAL-REF>
               <START-POSITION>0</START-POSITION>
             </PDU-SIGNAL-MAPPING>
           </SIGNAL-MAPPINGS>

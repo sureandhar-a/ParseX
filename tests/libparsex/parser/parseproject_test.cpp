@@ -73,8 +73,8 @@ const ParsedFile* findFile(const ParsedProject& project, const std::string& name
 TEST(ParseProjectTest, ExplicitListCollectsThreeFilesInOrder) {
     const std::vector<std::filesystem::path> entries = {
         fixture("parsefile_complete.arxml"),
-        fixture("system-4.2.arxml"),
         fixture("release_multiline.arxml"),
+        fixture("warnings_missing_fields.arxml"),
     };
     const ParsedProject project =
         Parser{}.parseProject(entries, FileDiscoveryMode::ExplicitList);
@@ -83,14 +83,20 @@ TEST(ParseProjectTest, ExplicitListCollectsThreeFilesInOrder) {
     EXPECT_EQ(project.files.at(0).autosarRelease, "4.4.0");
     EXPECT_EQ(project.files.at(0).sourcePath, entries.at(0));
     EXPECT_EQ(project.files.at(0).frames.size(), 1U);
-    EXPECT_EQ(project.files.at(1).autosarRelease, "4.4.0");
+    EXPECT_EQ(project.files.at(1).autosarRelease, "4.2.2");
     EXPECT_EQ(project.files.at(1).sourcePath, entries.at(1));
-    EXPECT_EQ(project.files.at(1).frames.size(), 8U);
-    EXPECT_EQ(project.files.at(2).autosarRelease, "4.2.2");
+    EXPECT_EQ(project.files.at(2).autosarRelease, "4.4.0");
     EXPECT_EQ(project.files.at(2).sourcePath, entries.at(2));
 
-    // No cross-file resolution yet.
-    EXPECT_TRUE(project.resolvedRefs.empty());
+    // 5 edges from the complete file (tx + pdu + mapping + receiver +
+    // member), 0 from the empty multiline file, 2 from the warnings file.
+    EXPECT_EQ(project.resolvedRefs.size(), 7U);
+    EXPECT_EQ(project.resolvedRefs.at("Frame_1.pdus[0]").targetShortNamePath, "Pdu_1");
+    EXPECT_EQ(project.resolvedRefs.at("Frame_1.transmitters[0]").targetShortNamePath,
+              "ECU_A");
+    EXPECT_EQ(project.resolvedRefs.at("Pdu_1.signalMappings[0]").targetShortNamePath,
+              "Signal_1");
+    EXPECT_EQ(project.resolvedRefs.at("NoLen.pdus[0]").targetShortNamePath, "NoLenPdu");
 }
 
 TEST(ParseProjectTest, OneFailingFileFailsTheWholeCall) {
@@ -178,10 +184,18 @@ TEST(ParseProjectTest, LazyDiscoversTwoLevelsDeep) {
     ASSERT_EQ(entry->signalGroups.size(), 1U);
     EXPECT_EQ(entry->signalGroups.at(0).members, std::vector<std::string>{"S2"});
 
-    // Contrast: DirectoryScan sees only the top level here.
-    const ParsedProject flat = Parser{}.parseProject(
-        {scratch / "entry.arxml"}, FileDiscoveryMode::DirectoryScan);
-    EXPECT_EQ(flat.files.size(), 1U);
+    // Cross-file edges land in resolvedRefs: transmitter + PDU + member.
+    EXPECT_EQ(project.resolvedRefs.size(), 3U);
+    EXPECT_EQ(project.resolvedRefs.at("F0.transmitters[0]").targetShortNamePath, "E9");
+    EXPECT_EQ(project.resolvedRefs.at("F0.pdus[0]").targetShortNamePath, "P1");
+    EXPECT_EQ(project.resolvedRefs.at("G0.members[0]").targetShortNamePath, "S2");
+
+    // Contrast: DirectoryScan sees only the top level here, so the same entry
+    // that lazy completes leaves dangling refs under the single-level scan —
+    // the modes genuinely differ, and the final check says so loudly.
+    EXPECT_THROW(Parser{}.parseProject({scratch / "entry.arxml"},
+                                       FileDiscoveryMode::DirectoryScan),
+                 DanglingFileReferenceError);
 
     std::filesystem::remove_all(scratch, ignored);
 }
@@ -213,6 +227,7 @@ TEST(ParseProjectTest, LazyReferenceCycleTerminates) {
 }
 
 TEST(ParseProjectTest, LazyUnresolvableRefFailsFast) {
+
     const std::filesystem::path scratch = freshScratch("parsex_lazy_dangling_test");
     std::error_code ignored;
 
@@ -263,6 +278,45 @@ TEST(ParseProjectTest, LazyIterationCapStopsLongChain) {
     } catch (const DanglingFileReferenceError& err) {
         EXPECT_NE(std::find(err.refs().begin(), err.refs().end(), "S_51"),
                   err.refs().end());
+    }
+
+    std::filesystem::remove_all(scratch, ignored);
+}
+
+TEST(ParseProjectTest, RealFileOutOfDomainRefsThrow) {
+    // system-4.2.arxml parses file-by-file, but four of its frame refs point
+    // at existing-but-unbuilt PDU types (MULTIPLEXED/CONTAINER/SECURED/NM) —
+    // dangling within the six-type domain, so the final check must fail
+    // loudly rather than carry them silently.
+    try {
+        Parser{}.parseProject({fixture("system-4.2.arxml")},
+                              FileDiscoveryMode::ExplicitList);
+        FAIL() << "expected DanglingFileReferenceError";
+    } catch (const DanglingFileReferenceError& err) {
+        EXPECT_NE(std::find(err.refs().begin(), err.refs().end(), "multiplexed_message"),
+                  err.refs().end());
+        EXPECT_NE(std::string(err.what()).find("MultiplexedMessage.pdus[0]"),
+                  std::string::npos);
+    }
+}
+
+TEST(ParseProjectTest, DeliberateDanglingReferenceThrows) {
+    const std::filesystem::path scratch = freshScratch("parsex_dangling_test");
+    std::error_code ignored;
+
+    writeBytes(scratch / "entry.arxml",
+               arxmlDoc("  <FRAME><SHORT-NAME>F</SHORT-NAME><LENGTH>8</LENGTH>"
+                        "<PDUS><FRAME-PDU><PDU-REF>/P/P_GHOST</PDU-REF>"
+                        "<START-POSITION>0</START-POSITION></FRAME-PDU></PDUS></FRAME>"));
+
+    try {
+        Parser{}.parseProject({scratch / "entry.arxml"},
+                              FileDiscoveryMode::ExplicitList);
+        FAIL() << "expected DanglingFileReferenceError";
+    } catch (const DanglingFileReferenceError& err) {
+        EXPECT_EQ(err.refs(), std::vector<std::string>{"P_GHOST"});
+        EXPECT_NE(std::string(err.what()).find("F.pdus[0] -> P_GHOST"),
+                  std::string::npos);
     }
 
     std::filesystem::remove_all(scratch, ignored);
