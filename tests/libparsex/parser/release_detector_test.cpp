@@ -64,6 +64,33 @@ TEST(ReleaseDetectorTest, ExtraWhitespaceAroundPair) {
     EXPECT_EQ(detectSchemaFilename(document), std::optional<std::string>("AUTOSAR_00046.xsd"));
 }
 
+TEST(ReleaseDetectorTest, LineBreakInsideValue) {
+    // Some XML tools reformat attributes across lines; libxml2 normalizes
+    // the break to spaces, and any residual formatting must still split.
+    EXPECT_EQ(detectSchemaFilename(makeRootDocument(
+                  {{"xsi:schemaLocation",
+                    "http://autosar.org/schema/r4.0\nAUTOSAR_00046.xsd"}})),
+              std::optional<std::string>("AUTOSAR_00046.xsd"));
+    EXPECT_EQ(detectSchemaFilename(makeRootDocument(
+                  {{"xsi:schemaLocation",
+                    "http://autosar.org/schema/r4.0\r\n   AUTOSAR_4-2-2.xsd"}})),
+              std::optional<std::string>("AUTOSAR_4-2-2.xsd"));
+}
+
+TEST(ReleaseDetectorTest, MultilineAttributeFileEndToEnd) {
+    // release_multiline.arxml carries a genuine newline + indentation inside
+    // xsi:schemaLocation (older-style filename): XML normalization plus the
+    // detector must still yield the filename, then the release.
+    const auto path =
+        std::filesystem::path(PARSEX_FIXTURE_DIR) / "release_multiline.arxml";
+    const RawDocument document = loadRawDocument(path);
+    const std::optional<std::string> filename = detectSchemaFilename(document);
+    EXPECT_EQ(filename, std::optional<std::string>("AUTOSAR_4-2-2.xsd"));
+    if (filename.has_value()) {
+        EXPECT_EQ(resolveRelease(*filename), "4.2.2");
+    }
+}
+
 TEST(ReleaseDetectorTest, RealFileYieldsNumericFilename) {
     const auto path =
         std::filesystem::path(PARSEX_FIXTURE_DIR) / "system-4.2.arxml";
