@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AUTOSAR xmlns="http://autosar.org/schema/r4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://autosar.org/schema/r4.0 AUTOSAR_00046.xsd">
+  <AR-PACKAGES>
+    <AR-PACKAGE>
+      <SHORT-NAME>Sys</SHORT-NAME>
+      <ELEMENTS>
+        <CLUSTER>
+          <SHORT-NAME>CAN_Cluster</SHORT-NAME>
+          <CATEGORY>CAN</CATEGORY>
+          <BAUDRATE>500000</BAUDRATE>
+          <PHYSICAL-CHANNELS>
+            <PHYSICAL-CHANNEL>
+              <SHORT-NAME>can0</SHORT-NAME>
+            </PHYSICAL-CHANNEL>
+          </PHYSICAL-CHANNELS>
+        </CLUSTER>
+        <ECU-INSTANCE>
+          <SHORT-NAME>ECU_A</SHORT-NAME>
+          <CONNECTED-CHANNELS>
+            <CHANNEL-REF DEST="PHYSICAL-CHANNEL">/Sys/CAN_Cluster/can0</CHANNEL-REF>
+          </CONNECTED-CHANNELS>
+          <CONTROLLERS>
+            <CAN-CONTROLLER>
+              <SHORT-NAME>CanCtrl_1</SHORT-NAME>
+            </CAN-CONTROLLER>
+          </CONTROLLERS>
+        </ECU-INSTANCE>
+        <FRAME>
+          <SHORT-NAME>Frame_1</SHORT-NAME>
+          <LENGTH>8</LENGTH>
+          <TRANSMITTERS>
+            <TRANSMITTER-REF DEST="ECU-INSTANCE">/Sys/ECU_A</TRANSMITTER-REF>
+          </TRANSMITTERS>
+          <PDUS>
+            <FRAME-PDU>
+              <SHORT-NAME>Frame_1_Pdu_1</SHORT-NAME>
+              <PDU-REF DEST="PDU">/Sys/Pdu_1</PDU-REF>
+              <START-POSITION>0</START-POSITION>
+            </FRAME-PDU>
+          </PDUS>
+        </FRAME>
+        <PDU>
+          <SHORT-NAME>Pdu_1</SHORT-NAME>
+          <LENGTH>8</LENGTH>
+          <SIGNAL-MAPPINGS>
+            <PDU-SIGNAL-MAPPING>
+              <SHORT-NAME>Pdu_1_Signal_1</SHORT-NAME>
+              <SIGNAL-REF DEST="SYSTEM-SIGNAL">/Sys/Signal_1</SIGNAL-REF>
+              <START-POSITION>0</START-POSITION>
+              <BYTE-ORDER>MOST-SIGNIFICANT-BYTE-FIRST</BYTE-ORDER>
+            </PDU-SIGNAL-MAPPING>
+          </SIGNAL-MAPPINGS>
+        </PDU>
+        <SYSTEM-SIGNAL>
+          <SHORT-NAME>Signal_1</SHORT-NAME>
+          <START-BIT>0</START-BIT>
+          <BIT-LENGTH>16</BIT-LENGTH>
+          <BYTE-ORDER>MOST-SIGNIFICANT-BYTE-FIRST</BYTE-ORDER>
+          <RECEIVERS>
+            <RECEIVER-REF DEST="ECU-INSTANCE">/Sys/ECU_A</RECEIVER-REF>
+          </RECEIVERS>
+        </SYSTEM-SIGNAL>
+        <SIGNAL-GROUP>
+          <SHORT-NAME>SignalGroup_1</SHORT-NAME>
+          <MEMBERS>
+            <SYSTEM-SIGNAL-REF DEST="SYSTEM-SIGNAL">/Sys/Signal_1</SYSTEM-SIGNAL-REF>
+          </MEMBERS>
+        </SIGNAL-GROUP>
+      </ELEMENTS>
+    </AR-PACKAGE>
+  </AR-PACKAGES>
+</AUTOSAR>
