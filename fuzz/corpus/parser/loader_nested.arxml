@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SYSTEM>
+  <ECUS>
+    <ECU-INSTANCE ID="a">
+      <SHORT-NAME>ECU_A</SHORT-NAME>
+      <EMPTY/>
+    </ECU-INSTANCE>
+    <ECU-INSTANCE ID="b">
+      <SHORT-NAME>ECU_B</SHORT-NAME>
+      <CHANNELS>
+        <CHANNEL>ch0</CHANNEL>
+        <CHANNEL>ch1</CHANNEL>
+      </CHANNELS>
+    </ECU-INSTANCE>
+  </ECUS>
+  <TAIL>done</TAIL>
+</SYSTEM>

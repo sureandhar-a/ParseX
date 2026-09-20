@@ -29,6 +29,13 @@ add_subdirectory(parsex-cli)
 add_subdirectory(parsex-mcp)
 add_subdirectory(tests)
 
+# libFuzzer harness (off by default: needs Clang with the libFuzzer runtime —
+# Homebrew LLVM on macOS, not Xcode CLT; see fuzz/fuzz_parser.cpp).
+option(PARSEX_ENABLE_FUZZING "Build the libFuzzer parser harness" OFF)
+if(PARSEX_ENABLE_FUZZING)
+    add_subdirectory(fuzz)
+endif()
+
 # User-supplied AUTOSAR XSD schemas (see resources/schemas/README.md).
 # The .xsd files are copyrighted, gitignored, and provided by each user — the
 # repo tracks only the layout. Whatever *.xsd files are present locally ship
