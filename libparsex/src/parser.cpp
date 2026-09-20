@@ -4,8 +4,10 @@
 #include <parsex/parser/model_builder.hpp>
 #include <parsex/parser/release_detector.hpp>
 
+#include <cctype>
 #include <memory>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -35,6 +37,16 @@ void buildSubtree(const RawNode& node, ParsedFile& file) {
     }
 }
 
+// Case-insensitive: some tools emit .ARXML / .ArXml.
+bool isArxmlFile(const std::filesystem::path& path) {
+    std::string extension = path.extension().string();
+    for (char& letter : extension) {
+        letter =
+            static_cast<char>(std::tolower(static_cast<unsigned char>(letter)));
+    }
+    return extension == ".arxml";
+}
+
 }  // namespace
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static): stateless-by-design instance API — callers write Parser{}.parseFile(...).
@@ -60,15 +72,40 @@ ParsedFile Parser::parseFile(const std::filesystem::path& path) const {
 
 ParsedProject Parser::parseProject(const std::vector<std::filesystem::path>& entryPoints,
                                    FileDiscoveryMode mode) const {
-    if (mode != FileDiscoveryMode::ExplicitList) {
+    if (mode == FileDiscoveryMode::LazyOnReference) {
         throw std::runtime_error(
-            "parsex: only FileDiscoveryMode::ExplicitList is implemented so far");
+            "parsex: FileDiscoveryMode::LazyOnReference is not implemented yet");
+    }
+    if (mode == FileDiscoveryMode::ExplicitList) {
+        ParsedProject project;
+        for (const auto& entry : entryPoints) {
+            // Deliberately no try/catch: one failing file fails the whole call
+            // (see header). Partial results are discarded with the project.
+            project.files.push_back(parseFile(entry));
+        }
+        return project;
+    }
+    // DirectoryScan: every .arxml sibling of every entry point (single level,
+    // non-recursive by design — see FileDiscoveryMode), plus the entry points
+    // themselves. Absolute normalized paths dedupe shared directories and keep
+    // ParsedProject.files in deterministic (sorted) order.
+    std::set<std::filesystem::path> discovered;
+    for (const auto& entry : entryPoints) {
+        discovered.insert(std::filesystem::absolute(entry).lexically_normal());
+        std::filesystem::path directory = entry.parent_path();
+        if (directory.empty()) {
+            directory = std::filesystem::current_path();
+        }
+        for (const auto& sibling : std::filesystem::directory_iterator(directory)) {
+            if (sibling.is_regular_file() && isArxmlFile(sibling.path())) {
+                discovered.insert(
+                    std::filesystem::absolute(sibling.path()).lexically_normal());
+            }
+        }
     }
     ParsedProject project;
-    for (const auto& entry : entryPoints) {
-        // Deliberately no try/catch: one failing file fails the whole call
-        // (see header). Partial results are discarded with the project.
-        project.files.push_back(parseFile(entry));
+    for (const auto& path : discovered) {
+        project.files.push_back(parseFile(path));
     }
     return project;
 }

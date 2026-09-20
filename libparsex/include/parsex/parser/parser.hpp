@@ -6,9 +6,10 @@
 #include <parsex/model/parsed_file.hpp>
 #include <parsex/model/parsed_project.hpp>
 
-// How parseProject() finds the files that make up a project. Only
-// ExplicitList is implemented so far; DirectoryScan and LazyOnReference
-// arrive in later subtasks.
+// How parseProject() finds the files that make up a project. DirectoryScan
+// is a single-level sibling scan (no recursion — recursive needs are served
+// by LazyOnReference, driven by actual cross-file references). LazyOnReference
+// arrives in a later subtask.
 enum class FileDiscoveryMode { ExplicitList, DirectoryScan, LazyOnReference };
 
 // Stateless Parser: no shared mutable state across calls, so parseFile() is
@@ -28,9 +29,11 @@ class Parser {
 public:
     Parser() = default;
     ParsedFile parseFile(const std::filesystem::path& path) const;
-    // Parses every file in entryPoints independently (via parseFile) and
-    // collects the results into ParsedProject.files, in order. Cross-file
-    // reference resolution is a later subtask — resolvedRefs stays empty.
+    // Parses a whole project and collects the results into ParsedProject.files,
+    // in deterministic order. ExplicitList parses exactly entryPoints;
+    // DirectoryScan adds every .arxml sibling (case-insensitive, single
+    // level, deduped) of each entry point's directory. Cross-file reference
+    // resolution is a later subtask — resolvedRefs stays empty.
     //
     // Whole-call failure (v1 default, documented choice): if any single file
     // fails, its exception propagates and the entire call fails. A project
