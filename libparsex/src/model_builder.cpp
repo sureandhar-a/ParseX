@@ -184,9 +184,17 @@ std::string extractShortName(const RawNode& node) {
 
 // Single shared population point for the composed CommonFields block (same
 // "one place to change" reasoning as CommonFields itself being shared).
-CommonFields populateCommonFields(const RawNode& node) {
+CommonFields populateCommonFields(const RawNode& node, std::vector<Warning>& warnings) {
     CommonFields common;
     common.shortName = extractShortName(node);
+    if (common.shortName.empty()) {
+        // SHORT-NAME is required on every named AUTOSAR element; without it
+        // every message below would quote an empty name, so flag it here once.
+        Warning warning;
+        warning.message = "<" + node.tagName + "> element has no SHORT-NAME";
+        warning.location = node.span;
+        warnings.push_back(std::move(warning));
+    }
     const std::optional<std::string> category = childText(node, "CATEGORY");
     if (category.has_value()) {
         common.category = category.value();
@@ -195,6 +203,13 @@ CommonFields populateCommonFields(const RawNode& node) {
     // copy is the back-reference the Write Engine will splice through later.
     common.rawSpanRef = node.span;
     return common;
+}
+
+void warnMissing(std::vector<Warning>& warnings, std::string message, RawSpan span) {
+    Warning warning;
+    warning.message = std::move(message);
+    warning.location = span;
+    warnings.push_back(std::move(warning));
 }
 
 // Trimmed texts of `refTag` descendants (optionally scoped under a wrapper):
@@ -252,9 +267,9 @@ std::uint32_t childUint32(const RawNode& node, const std::string& tag, std::uint
 
 }  // namespace
 
-Cluster buildCluster(const RawNode& node) {
+Cluster buildCluster(const RawNode& node, std::vector<Warning>& warnings) {
     Cluster cluster;
-    cluster.common = populateCommonFields(node);
+    cluster.common = populateCommonFields(node, warnings);
     // Flat BAUDRATE (study vocabulary) or nested under CAN-CLUSTER-VARIANTS /
     // CAN-CLUSTER-CONDITIONAL (real vocabulary) — first hit wins.
     std::optional<std::string> baudrate = childText(node, "BAUDRATE");
@@ -264,7 +279,10 @@ Cluster buildCluster(const RawNode& node) {
             baudrate = trimText(found->text);
         }
     }
-    if (baudrate.has_value()) {
+    if (!baudrate.has_value()) {
+        warnMissing(warnings, "Cluster '" + cluster.common.shortName + "' has no baudrate",
+                    node.span);
+    } else {
         const std::optional<std::uint32_t> parsed = parseUint32(baudrate.value());
         if (parsed.has_value()) {
             cluster.baudrate = parsed.value();
@@ -274,17 +292,29 @@ Cluster buildCluster(const RawNode& node) {
     return cluster;
 }
 
-EcuInstance buildEcuInstance(const RawNode& node) {
+EcuInstance buildEcuInstance(const RawNode& node, std::vector<Warning>& warnings) {
     EcuInstance ecu;
-    ecu.common = populateCommonFields(node);
+    ecu.common = populateCommonFields(node, warnings);
     ecu.connectedChannels = refShortNames(node, "CHANNEL-REF");
     ecu.controllers = controllerShortNames(node);
+    if (ecu.controllers.empty() && ecu.connectedChannels.empty()) {
+        warnMissing(warnings,
+                    "EcuInstance '" + ecu.common.shortName +
+                        "' has no controllers and no connected channels",
+                    node.span);
+    }
     return ecu;
 }
 
-Frame buildFrame(const RawNode& node) {
+Frame buildFrame(const RawNode& node, std::vector<Warning>& warnings) {
     Frame frame;
-    frame.common = populateCommonFields(node);
+    frame.common = populateCommonFields(node, warnings);
+    const bool hasLength =
+        findChild(node, "LENGTH") != nullptr || findChild(node, "FRAME-LENGTH") != nullptr;
+    if (!hasLength) {
+        warnMissing(warnings, "Frame '" + frame.common.shortName + "' has no length",
+                    node.span);
+    }
     frame.length = childUint32(node, "LENGTH", childUint32(node, "FRAME-LENGTH", 0));
     frame.transmitters = refShortNames(node, "TRANSMITTER-REF");
     for (const auto& tags : {findDescendants(node, "FRAME-PDU"),
@@ -297,12 +327,19 @@ Frame buildFrame(const RawNode& node) {
             frame.pdus.push_back(std::move(entry));
         }
     }
+    if (frame.pdus.empty()) {
+        warnMissing(warnings, "Frame '" + frame.common.shortName + "' has no PDU mappings",
+                    node.span);
+    }
     return frame;
 }
 
-Pdu buildPdu(const RawNode& node) {
+Pdu buildPdu(const RawNode& node, std::vector<Warning>& warnings) {
     Pdu pdu;
-    pdu.common = populateCommonFields(node);
+    pdu.common = populateCommonFields(node, warnings);
+    if (findChild(node, "LENGTH") == nullptr) {
+        warnMissing(warnings, "Pdu '" + pdu.common.shortName + "' has no length", node.span);
+    }
     pdu.length = childUint32(node, "LENGTH", 0);
     for (const auto& tags : {findDescendants(node, "PDU-SIGNAL-MAPPING"),
                              findDescendants(node, "I-SIGNAL-TO-I-PDU-MAPPING"),}) {
@@ -325,14 +362,25 @@ Pdu buildPdu(const RawNode& node) {
             pdu.signalMappings.push_back(std::move(entry));
         }
     }
+    if (pdu.signalMappings.empty()) {
+        warnMissing(warnings, "Pdu '" + pdu.common.shortName + "' maps no signals",
+                    node.span);
+    }
     return pdu;
 }
 
-Signal buildSignal(const RawNode& node) {
+Signal buildSignal(const RawNode& node, std::vector<Warning>& warnings) {
     Signal signal;
-    signal.common = populateCommonFields(node);
+    signal.common = populateCommonFields(node, warnings);
     signal.startBit = childUint32(node, "START-BIT", 0);
-    // SYSTEM-SIGNAL carries BIT-LENGTH; I-SIGNAL carries LENGTH instead.
+    // Only I-SIGNAL owns its length: LENGTH is schema-required there, so its
+    // absence is always worth flagging. A SYSTEM-SIGNAL's length lives on its
+    // I-SIGNAL instead — absence here is normal (even bare stubs stay silent),
+    // so the tag gate is the whole rule.
+    if (node.tagName == "I-SIGNAL" && findChild(node, "LENGTH") == nullptr) {
+        warnMissing(warnings, "Signal '" + signal.common.shortName + "' has no bit length",
+                    node.span);
+    }
     signal.bitLength = childUint32(node, "BIT-LENGTH", childUint32(node, "LENGTH", 0));
     const std::optional<std::string> order = childText(node, "BYTE-ORDER");
     if (order.has_value()) {
@@ -374,14 +422,18 @@ Signal buildSignal(const RawNode& node) {
     return signal;
 }
 
-SignalGroup buildSignalGroup(const RawNode& node) {
+SignalGroup buildSignalGroup(const RawNode& node, std::vector<Warning>& warnings) {
     SignalGroup group;
-    group.common = populateCommonFields(node);
+    group.common = populateCommonFields(node, warnings);
     // Real vocabulary references I-SIGNALs; the study vocabulary references
     // SYSTEM-SIGNALs — both reduce to short names uniformly.
     std::vector<std::string> members = refShortNames(node, "I-SIGNAL-REF");
     const std::vector<std::string> systemRefs = refShortNames(node, "SYSTEM-SIGNAL-REF");
     members.insert(members.end(), systemRefs.begin(), systemRefs.end());
     group.members = std::move(members);
+    if (group.members.empty()) {
+        warnMissing(warnings, "SignalGroup '" + group.common.shortName + "' has no members",
+                    node.span);
+    }
     return group;
 }

@@ -1,11 +1,15 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include <parsex/model/cluster.hpp>
 #include <parsex/model/ecu_instance.hpp>
 #include <parsex/model/frame.hpp>
 #include <parsex/model/pdu.hpp>
 #include <parsex/model/signal.hpp>
 #include <parsex/model/signal_group.hpp>
+#include <parsex/model/parsed_file.hpp>
 #include <parsex/raw/raw_node.hpp>
 
 // Protocol Model Builder: one small function per domain type, each projecting
@@ -21,6 +25,14 @@
 // to short names (text after the last '/'): the domain's join keys are short
 // names, and the full path is not recoverable from a short name while the
 // reverse always is.
+//
+// Best-effort is not silent: when a schema-expected element is missing, each
+// build appends a Warning (specific object + field, located at the containing
+// element's span) to `warnings`, which the caller threads into
+// ParsedFile.warnings. A defaulted field with no warning means "genuinely
+// specified (or legitimately absent)"; a defaulted field WITH a warning means
+// "missing from the source". Unparseable values keep defaults without
+// warnings — validation owns those.
 //
 // Observed XML shapes (per-release notes — read from the fixtures, not assumed):
 //
@@ -51,9 +63,11 @@
 //   I-SIGNAL{SHORT-NAME, LENGTH, INIT-VALUE/NUMERICAL-VALUE-SPECIFICATION/VALUE,
 //     NETWORK-REPRESENTATION-PROPS/.../BASE-TYPE-REF, SYSTEM-SIGNAL-REF}
 //     (no START-BIT / BYTE-ORDER / RECEIVERS on the node — packing lives on the
-//     owning PDU's mapping and lands in PduSignalMapping, not here)
+//     owning PDU's mapping and lands in PduSignalMapping, not here; LENGTH is
+//     schema-required on I-SIGNAL, so only that tag warns when it is missing)
 //   SYSTEM-SIGNAL{SHORT-NAME, PHYSICAL-PROPS/.../COMPU-METHOD-REF}
-//     (scaling behind the COMPU-METHOD ref — factor/offset stay default here)
+//     (scaling behind the COMPU-METHOD ref — factor/offset stay default here;
+//     no length field of its own exists, so bare stubs stay silent by design)
 //   I-SIGNAL-GROUP{SHORT-NAME, I-SIGNAL-REFS/I-SIGNAL-REF,
 //     TRANSFORMATION-... (ignored)}
 //
@@ -72,9 +86,9 @@
 // - Same-short-name collisions across packages would confuse short-name joins;
 //   accepted v1 limitation (Resolver revisit).
 
-Cluster buildCluster(const RawNode& node);
-EcuInstance buildEcuInstance(const RawNode& node);
-Frame buildFrame(const RawNode& node);
-Pdu buildPdu(const RawNode& node);
-Signal buildSignal(const RawNode& node);
-SignalGroup buildSignalGroup(const RawNode& node);
+Cluster buildCluster(const RawNode& node, std::vector<Warning>& warnings);
+EcuInstance buildEcuInstance(const RawNode& node, std::vector<Warning>& warnings);
+Frame buildFrame(const RawNode& node, std::vector<Warning>& warnings);
+Pdu buildPdu(const RawNode& node, std::vector<Warning>& warnings);
+Signal buildSignal(const RawNode& node, std::vector<Warning>& warnings);
+SignalGroup buildSignalGroup(const RawNode& node, std::vector<Warning>& warnings);
