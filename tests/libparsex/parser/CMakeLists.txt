@@ -5,6 +5,7 @@ add_executable(parser_tests
     release_detector_test.cpp
     model_builder_test.cpp
     parsefile_test.cpp
+    parseproject_test.cpp
 )
 
 target_link_libraries(

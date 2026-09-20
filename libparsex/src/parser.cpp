@@ -57,3 +57,18 @@ ParsedFile Parser::parseFile(const std::filesystem::path& path) const {
     file.rawDocument = std::make_shared<RawDocument>(std::move(document));
     return file;
 }
+
+ParsedProject Parser::parseProject(const std::vector<std::filesystem::path>& entryPoints,
+                                   FileDiscoveryMode mode) const {
+    if (mode != FileDiscoveryMode::ExplicitList) {
+        throw std::runtime_error(
+            "parsex: only FileDiscoveryMode::ExplicitList is implemented so far");
+    }
+    ParsedProject project;
+    for (const auto& entry : entryPoints) {
+        // Deliberately no try/catch: one failing file fails the whole call
+        // (see header). Partial results are discarded with the project.
+        project.files.push_back(parseFile(entry));
+    }
+    return project;
+}
