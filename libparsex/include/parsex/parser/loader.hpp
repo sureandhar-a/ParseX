@@ -33,7 +33,9 @@
 // XML_PARSE_NONET, and no XML_PARSE_NOENT / XML_PARSE_DTDLOAD, so external
 // entities stay unresolved.
 //
-// Hard failures (unreadable file, no document element, ill-formed XML) throw
-// std::runtime_error for now; the error-handling PBI owns the final failure
-// taxonomy (including the XXE-rejection test that builds on this setup).
+// Hard failures throw ParseError (see parser/parse_error.hpp): unreadable
+// files as ParseErrorReason::Io (checked before any libxml2 context exists),
+// malformed XML as ParseErrorReason::Syntax with libxml2's own message plus
+// line/column folded in (captured via a context error handler, so nothing
+// leaks to stderr).
 RawDocument loadRawDocument(const std::filesystem::path& path);

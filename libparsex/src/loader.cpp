@@ -1,4 +1,5 @@
 #include <parsex/parser/loader.hpp>
+#include <parsex/parser/parse_error.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -9,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -31,11 +33,68 @@ std::size_t unitWidth(RawEncodingClass encoding) {
 }
 
 std::string readFileBytes(const std::filesystem::path& path) {
+    // I/O is checked before any libxml2 context exists, so failures surface
+    // as ParseError[Io] with the path — never as a libxml2-internal error.
+    std::error_code statusError;
+    if (!std::filesystem::exists(path, statusError) || statusError) {
+        throw ParseError(ParseErrorReason::Io, path, "file does not exist");
+    }
+    if (!std::filesystem::is_regular_file(path, statusError) || statusError) {
+        throw ParseError(ParseErrorReason::Io, path, "not a regular file");
+    }
     std::ifstream input(path, std::ios::binary);
     if (!input) {
-        throw std::runtime_error("parsex: cannot open file: " + path.string());
+        throw ParseError(ParseErrorReason::Io, path, "file cannot be opened for reading");
     }
-    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+    std::string bytes{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+    if (input.bad()) {
+        throw ParseError(ParseErrorReason::Io, path, "error while reading file");
+    }
+    return bytes;
+}
+
+// First libxml2 error wins (it is usually the root cause; later ones tend to
+// be recovery fallout). Installed as the context error handler, this also
+// silences libxml2's default stderr output for the parse.
+struct LibxmlErrorCapture {
+    std::string message;
+    int line = 0;
+    int column = 0;
+    bool hasError = false;
+};
+
+void onLibxmlError(void* userData, const xmlError* error) {
+    auto* capture = static_cast<LibxmlErrorCapture*>(userData);
+    if (capture->hasError || error == nullptr || error->message == nullptr) {
+        return;
+    }
+    capture->message = error->message;
+    capture->line = error->line;
+    capture->column = error->int2;
+    capture->hasError = true;
+}
+
+std::string syntaxDetail(const LibxmlErrorCapture& capture) {
+    std::string detail = "malformed XML";
+    if (capture.line > 0) {
+        detail += " at line " + std::to_string(capture.line);
+        if (capture.column > 0) {
+            detail += ", column " + std::to_string(capture.column);
+        }
+    }
+    if (!capture.message.empty()) {
+        // libxml2 messages arrive newline-terminated; trim the tail.
+        std::string message = capture.message;
+        while (!message.empty() &&
+               (message.back() == '\n' || message.back() == '\r' ||
+                message.back() == ' ')) {
+            message.pop_back();
+        }
+        if (!message.empty()) {
+            detail += ": " + message;
+        }
+    }
+    return detail;
 }
 
 std::string asciiUpper(std::string text) {
@@ -571,6 +630,8 @@ RawDocument loadRawDocument(const std::filesystem::path& path) {
     // makes xmlFreeParserCtxt() free it (SIGABRT at cleanup, seen in the spike).
     *ctxt->sax = sax;
     ctxt->userData = &state;
+    LibxmlErrorCapture errorCapture;
+    xmlCtxtSetErrorHandler(ctxt.get(), &onLibxmlError, &errorCapture);
 
     // Single parse pass over the bytes already in memory (the buffer outlives
     // the parse; it is a local). SAX callbacks drive the raw scanner in
@@ -581,7 +642,7 @@ RawDocument loadRawDocument(const std::filesystem::path& path) {
                                       nullptr, XML_PARSE_NONET);
     xmlFreeDoc(doc);  // null with a custom SAX handler; freed defensively
     if (ctxt->wellFormed != 1) {
-        throw std::runtime_error("parsex: ill-formed XML in: " + narrowPath);
+        throw ParseError(ParseErrorReason::Syntax, path, syntaxDetail(errorCapture));
     }
     if (state.root == nullptr) {
         throw std::runtime_error("parsex: no document element in: " + narrowPath);

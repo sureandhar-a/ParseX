@@ -6,6 +6,7 @@ add_executable(parser_tests
     model_builder_test.cpp
     parsefile_test.cpp
     parseproject_test.cpp
+    parse_error_test.cpp
 )
 
 target_link_libraries(

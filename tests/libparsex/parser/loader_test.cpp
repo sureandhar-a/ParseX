@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include <parsex/parser/loader.hpp>
+#include <parsex/parser/parse_error.hpp>
 #include <parsex/raw/raw_span.hpp>
 
 #include <filesystem>
@@ -254,7 +255,8 @@ TEST(LoaderTest, CharacterDataCapturedAsNodeText) {
     EXPECT_EQ(empty->text, "");
 }
 
-TEST(LoaderTest, MissingFileThrows) {    EXPECT_THROW(loadRawDocument(fixture("does-not-exist.arxml")), std::runtime_error);
+TEST(LoaderTest, MissingFileThrows) {
+    EXPECT_THROW(loadRawDocument(fixture("does-not-exist.arxml")), ParseError);
 }
 
 TEST(LoaderTest, IllFormedFileThrows) {
@@ -263,7 +265,12 @@ TEST(LoaderTest, IllFormedFileThrows) {
         std::ofstream out(path, std::ios::binary);
         out << "<A><B></A>";
     }
-    EXPECT_THROW(loadRawDocument(path), std::runtime_error);
+    try {
+        loadRawDocument(path);
+        FAIL() << "expected ParseError";
+    } catch (const ParseError& err) {
+        EXPECT_EQ(err.reason(), ParseErrorReason::Syntax);
+    }
     std::error_code ignored;
     std::filesystem::remove(path, ignored);
 }
