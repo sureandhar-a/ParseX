@@ -2,6 +2,7 @@ add_executable(parser_tests
     dummy_test.cpp
     secure_reader_test.cpp
     loader_test.cpp
+    release_detector_test.cpp
 )
 
 target_link_libraries(
