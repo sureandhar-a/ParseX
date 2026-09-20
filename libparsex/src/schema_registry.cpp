@@ -37,8 +37,11 @@ void onParseError(void* ctx, const char* msg, ...) {
     ++log->errorCount;
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,cppcoreguidelines-init-variables): va_start protocol.
     va_list args;
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay): va_list is an array type on LP64.
     va_start(args, msg);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay): forwarding the va_list is unavoidable.
     appendFormatted(log, msg, args);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay): va_end protocol.
     va_end(args);
 }
 
