@@ -197,7 +197,7 @@ CommonFields populateCommonFields(const RawNode& node, std::vector<Warning>& war
     }
     const std::optional<std::string> category = childText(node, "CATEGORY");
     if (category.has_value()) {
-        common.category = category.value();
+        common.category = category;
     }
     // No XML reading here: the Loader already computed this span, and this
     // copy is the back-reference the Write Engine will splice through later.
@@ -283,10 +283,7 @@ Cluster buildCluster(const RawNode& node, std::vector<Warning>& warnings) {
         warnMissing(warnings, "Cluster '" + cluster.common.shortName + "' has no baudrate",
                     node.span);
     } else {
-        const std::optional<std::uint32_t> parsed = parseUint32(baudrate.value());
-        if (parsed.has_value()) {
-            cluster.baudrate = parsed.value();
-        }
+        cluster.baudrate = parseUint32(baudrate.value());
     }
     cluster.physicalChannels = channelShortNames(node);
     return cluster;
