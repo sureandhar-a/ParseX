@@ -134,13 +134,31 @@ SchemaResolutionResult resolveSchema(const std::string& release, OperationTeleme
         originPath = sourcePath;
         try {
             writeCacheAtomically(cachePath, readFileBytes(sourcePath, release));
+            // Stage the sibling import every AUTOSAR schema resolves
+            // relatively (schemaLocation="xml.xsd"), so the cached copy
+            // parses exactly like the source. Skipped when the source has no
+            // such sibling (e.g. test fixtures). v1 handles xml.xsd
+            // specifically — all seven supported schemas import exactly this
+            // one file; generalize if that ever changes.
+            const auto siblingSource = sourcePath.parent_path() / "xml.xsd";
+            std::error_code siblingError;
+            if (std::filesystem::is_regular_file(siblingSource, siblingError)) {
+                writeCacheAtomically(
+                    cachePath.parent_path() / "xml.xsd",
+                    readFileBytes(siblingSource, release));
+            }
             parsePath = cachePath;
         } catch (const std::exception&) {
             // The cache is a performance optimization, not a correctness
             // requirement — the source is always ground truth. A cache-write
             // failure (read-only home, full disk) degrades gracefully to
             // parsing the source directly instead of failing the operation.
+            // Drop any half-populated entry first so a later hit never parses
+            // a cache copy whose sidecar import is missing (single-threaded
+            // CLI: no concurrent writer can own this entry).
             // (No logging infra exists yet — hook a warning here when it does.)
+            std::error_code dropError;
+            std::filesystem::remove(cachePath, dropError);
             parsePath = sourcePath;
         }
     } else {
