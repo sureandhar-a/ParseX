@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Minimal stand-in schema for resolveSchema() tests: parses as a real
+     XSD via libxml2 but stays tiny and hermetic (no dependency on the
+     user-supplied AUTOSAR schemas). -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://parsex.test/mini"
+           xmlns="http://parsex.test/mini"
+           elementFormDefault="qualified">
+  <xs:element name="MiniRoot" type="xs:string"/>
+</xs:schema>

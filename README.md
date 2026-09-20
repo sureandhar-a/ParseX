@@ -11,6 +11,19 @@ brew install pkg-config
 
 This is required because vcpkg uses `pkg-config` during dependency configuration for packages such as `cli11` and `libxml2`.
 
+## Schemas (user-supplied)
+
+ParseX validates against the official AUTOSAR XSD schemas, which are
+copyrighted and therefore downloaded onto your machine, never shipped with
+the repo. Fetch them with the setup script (stdlib-only, hash-verified):
+
+```bash
+python3 scripts/download_schemas.py
+```
+
+See [`resources/schemas/README.md`](resources/schemas/README.md) for details
+and the manual fallback.
+
 ## Build
 
 Using the CMake preset:
@@ -36,3 +49,4 @@ cmake --build --preset release
 ## Documentation
 
 - [Shared types module reference](docs/shared-types.md) — the domain types, containers, and protocol-extension variant: which file to open for what.
+- [Schema Registry module reference](docs/schema-registry.md) — schema sources, disk cache, shared-handle contract, and the redistribution caveat.

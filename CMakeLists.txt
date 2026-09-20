@@ -29,6 +29,22 @@ add_subdirectory(parsex-cli)
 add_subdirectory(parsex-mcp)
 add_subdirectory(tests)
 
+# User-supplied AUTOSAR XSD schemas (see resources/schemas/README.md).
+# The .xsd files are copyrighted, gitignored, and provided by each user — the
+# repo tracks only the layout. Whatever *.xsd files are present locally ship
+# alongside the binaries via `cmake --install`, and are also copied into the
+# build tree so local runs and tests can find them.
+# NOTE: file(COPY) runs at configure time, so re-run configure after adding
+# new .xsd files.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/schemas")
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/schemas/"
+            DESTINATION "share/parsex/schemas"
+            FILES_MATCHING PATTERN "*.xsd")
+    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/resources/schemas/"
+         DESTINATION "${CMAKE_BINARY_DIR}/resources/schemas"
+         FILES_MATCHING PATTERN "*.xsd")
+endif()
+
 option(PARSEX_ENABLE_SANITIZERS "Build with ASan+UBSan instrumentation" OFF)
 
 add_library(parsex_sanitizers INTERFACE)
