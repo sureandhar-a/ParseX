@@ -81,3 +81,6 @@ downloads/
 # alongside every schema, so it IS committed.
 resources/schemas/*.xsd
 !resources/schemas/xml.xsd
+
+#Python cache
+*/__pycache__

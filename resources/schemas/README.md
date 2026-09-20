@@ -46,9 +46,22 @@ meaningful. All seven are well-formed XML with root `xs:schema` and
 
 ## How to obtain the schemas (each user, on their machine)
 
-The standalone `AUTOSAR_MMOD_XMLSchema.zip` archives are publicly reachable
-on autosar.org — no account needed for these (the login wall guards the full
-release *packages*, not the schema archives):
+Run the setup script (stdlib-only, no dependencies):
+
+```bash
+python3 scripts/download_schemas.py
+```
+
+It downloads the `AUTOSAR_MMOD_XMLSchema.zip` archives from the table below
+into `resources/schemas/`, verifies size + SHA-256 of every file, installs
+atomically, and skips files that are already current. Useful flags:
+`--dest DIR` (populate another directory, e.g. for `--xsd-path` use),
+`--releases 4.2.2 R21-11` (subset), `--force` (re-download), `--list`.
+Two implementation notes: autosar.org serves its TLS leaf without
+intermediates, so the script completes the chain via the issuer's
+AIA-published certificate and retries — verification is never disabled; and
+every installed byte is hash-pinned, so a transport attacker cannot slip in
+substitute content undetected.
 
 | Release | Archive URL |
 | --- | --- |
@@ -60,7 +73,7 @@ release *packages*, not the schema archives):
 | R20-11 | `https://www.autosar.org/fileadmin/standards/R20-11/FO/AUTOSAR_MMOD_XMLSchema.zip` (unified post-R19-11 schema, Foundation-hosted) |
 | R21-11 | `https://www.autosar.org/fileadmin/standards/R21-11/FO/AUTOSAR_MMOD_XMLSchema.zip` |
 
-Steps: download the archive(s) for the release(s) you need, extract the
+Steps (manual alternative to the script): download the archive(s) for the
 `.xsd`, rename it to the lookup key from the table above, and drop it in this
 directory (or any directory you then pass via `--xsd-path` /
 `$PARSEX_SCHEMA_DIR`). Then re-run configure — CMake copies `*.xsd` into the
