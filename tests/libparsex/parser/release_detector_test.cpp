@@ -70,3 +70,41 @@ TEST(ReleaseDetectorTest, RealFileYieldsNumericFilename) {
     const RawDocument document = loadRawDocument(path);
     EXPECT_EQ(detectSchemaFilename(document), std::optional<std::string>("AUTOSAR_00046.xsd"));
 }
+
+TEST(ReleaseDetectorTest, FilenameTableCoversSupportedRange) {
+    // Every (filename, release) pair mirrors scripts/download_schemas.py and
+    // the Schema Registry's vendored <release>.xsd keys.
+    EXPECT_EQ(resolveRelease("AUTOSAR_4-2-2.xsd"), "4.2.2");
+    EXPECT_EQ(resolveRelease("AUTOSAR_4-3-0.xsd"), "4.3.0");
+    EXPECT_EQ(resolveRelease("AUTOSAR_00044.xsd"), "4.3.1");
+    EXPECT_EQ(resolveRelease("AUTOSAR_00046.xsd"), "4.4.0");
+    EXPECT_EQ(resolveRelease("AUTOSAR_00048.xsd"), "R19-11");
+    EXPECT_EQ(resolveRelease("AUTOSAR_00049.xsd"), "R20-11");
+    EXPECT_EQ(resolveRelease("AUTOSAR_00050.xsd"), "R21-11");
+}
+
+TEST(ReleaseDetectorTest, UnknownFilenameThrowsWithFilenameInMessage) {
+    for (const std::string& filename :
+         {"AUTOSAR_4-1-3.xsd", "AUTOSAR_00099.xsd", "something.xsd", ""}) {
+        try {
+            resolveRelease(filename);
+            FAIL() << "expected UnsupportedReleaseError for '" << filename << "'";
+        } catch (const UnsupportedReleaseError& err) {
+            EXPECT_EQ(err.schemaFilename(), filename);
+            EXPECT_NE(std::string(err.what()).find(filename), std::string::npos)
+                << "message must contain the filename";
+        }
+    }
+}
+
+TEST(ReleaseDetectorTest, RealFileResolvesToRelease) {
+    const auto path =
+        std::filesystem::path(PARSEX_FIXTURE_DIR) / "system-4.2.arxml";
+    const RawDocument document = loadRawDocument(path);
+    const std::optional<std::string> filename = detectSchemaFilename(document);
+    // cantools' system-4.2 file declares the 4.4.0-era schema despite its name.
+    EXPECT_EQ(filename, std::optional<std::string>("AUTOSAR_00046.xsd"));
+    if (filename.has_value()) {
+        EXPECT_EQ(resolveRelease(*filename), "4.4.0");
+    }
+}

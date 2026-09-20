@@ -1,6 +1,7 @@
 #include <parsex/parser/release_detector.hpp>
 
 #include <cstddef>
+#include <map>
 
 namespace {
 
@@ -43,4 +44,27 @@ std::optional<std::string> detectSchemaFilename(const RawDocument& document) {
         return std::nullopt;
     }
     return location->substr(secondStart, tokenEnd(*location, secondStart) - secondStart);
+}
+
+const std::map<std::string, std::string>& schemaFilenameTable() {
+    // Keys are AUTOSAR's distribution filenames (see scripts/download_schemas.py);
+    // values are the Schema Registry's release keys (resources/schemas/<release>.xsd).
+    static const std::map<std::string, std::string> table{
+        {"AUTOSAR_4-2-2.xsd", "4.2.2"},
+        {"AUTOSAR_4-3-0.xsd", "4.3.0"},
+        {"AUTOSAR_00044.xsd", "4.3.1"},
+        {"AUTOSAR_00046.xsd", "4.4.0"},
+        {"AUTOSAR_00048.xsd", "R19-11"},
+        {"AUTOSAR_00049.xsd", "R20-11"},
+        {"AUTOSAR_00050.xsd", "R21-11"},
+    };
+    return table;
+}
+
+std::string resolveRelease(const std::string& schemaFilename) {
+    const auto found = schemaFilenameTable().find(schemaFilename);
+    if (found == schemaFilenameTable().end()) {
+        throw UnsupportedReleaseError(schemaFilename);
+    }
+    return found->second;
 }
