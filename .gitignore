@@ -84,3 +84,6 @@ resources/schemas/*.xsd
 
 #Python cache
 */__pycache__
+
+#spike folder
+spikes/*
