@@ -2,9 +2,14 @@
 
 #include <parsex/parser/loader.hpp>
 #include <parsex/parser/model_builder.hpp>
+#include <parsex/parser/project_error.hpp>
 #include <parsex/parser/release_detector.hpp>
 
+#include <algorithm>
 #include <cctype>
+#include <cstdint>
+#include <fstream>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <set>
@@ -47,6 +52,187 @@ bool isArxmlFile(const std::filesystem::path& path) {
     return extension == ".arxml";
 }
 
+// ---- LazyOnReference support ----
+
+// Hard backstop on the expansion loop: every productive iteration parses at
+// least one new file out of a finite candidate set, and a fruitless iteration
+// stops the loop outright — so termination never actually depends on this.
+// It exists so a pathological setup fails loudly instead of hanging the CLI.
+constexpr int kMaxLazyIterations = 50;
+
+// Short names still missing from the project, by the domain type that must
+// define them. Only reference targets that ARE domain objects are chased:
+// CHANNEL-REFs and controller names resolve to nested (non-domain) elements
+// that no file "defines" at project level, so chasing them could never
+// terminate successfully.
+struct WantedRefs {
+    std::set<std::string> pdus;
+    std::set<std::string> signals;
+    std::set<std::string> ecus;
+    [[nodiscard]] bool empty() const {
+        return pdus.empty() && signals.empty() && ecus.empty();
+    }
+};
+
+void wantName(std::set<std::string>& wanted, const std::set<std::string>& known,
+              const std::string& name) {
+    if (!name.empty() && !known.contains(name)) {
+        wanted.insert(name);
+    }
+}
+
+struct KnownRefs {
+    std::set<std::string> pdus;
+    std::set<std::string> signals;
+    std::set<std::string> ecus;
+};
+
+KnownRefs collectKnownRefs(const ParsedProject& project) {
+    KnownRefs known;
+    for (const auto& file : project.files) {
+        for (const auto& pdu : file.pdus) {
+            known.pdus.insert(pdu.common.shortName);
+        }
+        for (const auto& signal : file.signals) {
+            known.signals.insert(signal.common.shortName);
+        }
+        for (const auto& ecu : file.ecuInstances) {
+            known.ecus.insert(ecu.common.shortName);
+        }
+    }
+    return known;
+}
+
+void wantFrameRefs(const Frame& frame, const KnownRefs& known, WantedRefs& wanted) {
+    for (const auto& transmitter : frame.transmitters) {
+        wantName(wanted.ecus, known.ecus, transmitter);
+    }
+    for (const auto& mapping : frame.pdus) {
+        wantName(wanted.pdus, known.pdus, mapping.pduShortNameRef);
+    }
+}
+
+void wantFileRefs(const ParsedFile& file, const KnownRefs& known, WantedRefs& wanted) {
+    for (const auto& frame : file.frames) {
+        wantFrameRefs(frame, known, wanted);
+    }
+    for (const auto& pdu : file.pdus) {
+        for (const auto& mapping : pdu.signalMappings) {
+            wantName(wanted.signals, known.signals, mapping.signalShortNameRef);
+        }
+    }
+    for (const auto& signal : file.signals) {
+        for (const auto& receiver : signal.receivers) {
+            wantName(wanted.ecus, known.ecus, receiver);
+        }
+    }
+    for (const auto& group : file.signalGroups) {
+        for (const auto& member : group.members) {
+            wantName(wanted.signals, known.signals, member);
+        }
+    }
+}
+
+WantedRefs collectWantedRefs(const ParsedProject& project) {
+    const KnownRefs known = collectKnownRefs(project);
+    WantedRefs wanted;
+    for (const auto& file : project.files) {
+        wantFileRefs(file, known, wanted);
+    }
+    return wanted;
+}
+
+bool isSpaceByte(unsigned char unit) {
+    return unit == ' ' || unit == '\t' || unit == '\r' || unit == '\n';
+}
+
+// Cheap plausibility pre-filter: does the raw file contain an exact
+// `<SHORT-NAME>name</...` (or prefixed `<p:SHORT-NAME>name</...`) element?
+// Single-byte encodings only — UTF-16 files (BOM) always parse to decide
+// exactly. False positives (comments mentioning the name) are harmless: the
+// parse below decides exactly. False negatives would be DanglingFileReference
+// lies, hence the whitespace tolerance and the UTF-16 fallback.
+bool rawDefinesShortName(const std::string& bytes, const std::string& shortName) {
+    if (bytes.size() >= 2) {
+        const auto first = static_cast<unsigned char>(bytes.at(0));
+        const auto second = static_cast<unsigned char>(bytes.at(1));
+        if ((first == 0xFF && second == 0xFE) || (first == 0xFE && second == 0xFF)) {
+            return true;
+        }
+    }
+    const std::string opener = "SHORT-NAME>";
+    std::size_t pos = 0;
+    while ((pos = bytes.find(opener, pos)) != std::string::npos) {
+        if (pos == 0 || (bytes.at(pos - 1) != '<' && bytes.at(pos - 1) != ':')) {
+            ++pos;
+            continue;
+        }
+        std::size_t namePos = pos + opener.size();
+        while (namePos < bytes.size() && isSpaceByte(static_cast<unsigned char>(bytes.at(namePos)))) {
+            ++namePos;
+        }
+        if (bytes.compare(namePos, shortName.size(), shortName) != 0) {
+            pos = namePos;
+            continue;
+        }
+        std::size_t after = namePos + shortName.size();
+        while (after < bytes.size() && isSpaceByte(static_cast<unsigned char>(bytes.at(after)))) {
+            ++after;
+        }
+        if (after < bytes.size() && bytes.at(after) == '<') {
+            return true;
+        }
+        pos = after;
+    }
+    return false;
+}
+
+std::string readFileBytesOrEmpty(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) {
+        return "";
+    }
+    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+}
+
+std::vector<std::string> flattenWanted(const WantedRefs& wanted) {
+    std::vector<std::string> names;
+    for (const auto& nameSet : {wanted.pdus, wanted.signals, wanted.ecus}) {
+        names.insert(names.end(), nameSet.begin(), nameSet.end());
+    }
+    return names;
+}
+
+bool candidateDefinesAny(const std::filesystem::path& path, const WantedRefs& wanted) {
+    const std::string bytes = readFileBytesOrEmpty(path);
+    if (bytes.empty()) {
+        return true;  // Unreadable here; let the parse attempt decide (and skip).
+    }
+    const std::vector<std::string> names = flattenWanted(wanted);
+    return std::ranges::any_of(names, [&](const std::string& name) {
+        return rawDefinesShortName(bytes, name);
+    });
+}
+
+bool definesWantedName(const ParsedFile& file, const WantedRefs& wanted) {
+    const auto definesPdu = [&](const Pdu& pdu) {
+        return wanted.pdus.contains(pdu.common.shortName);
+    };
+    const auto definesSignal = [&](const Signal& signal) {
+        return wanted.signals.contains(signal.common.shortName);
+    };
+    const auto definesEcu = [&](const EcuInstance& ecu) {
+        return wanted.ecus.contains(ecu.common.shortName);
+    };
+    return std::ranges::any_of(file.pdus, definesPdu) ||
+           std::ranges::any_of(file.signals, definesSignal) ||
+           std::ranges::any_of(file.ecuInstances, definesEcu);
+}
+
+std::filesystem::path normalizePath(const std::filesystem::path& path) {
+    return std::filesystem::absolute(path).lexically_normal();
+}
+
 }  // namespace
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static): stateless-by-design instance API — callers write Parser{}.parseFile(...).
@@ -73,8 +259,7 @@ ParsedFile Parser::parseFile(const std::filesystem::path& path) const {
 ParsedProject Parser::parseProject(const std::vector<std::filesystem::path>& entryPoints,
                                    FileDiscoveryMode mode) const {
     if (mode == FileDiscoveryMode::LazyOnReference) {
-        throw std::runtime_error(
-            "parsex: FileDiscoveryMode::LazyOnReference is not implemented yet");
+        return parseProjectLazy(entryPoints);
     }
     if (mode == FileDiscoveryMode::ExplicitList) {
         ParsedProject project;
@@ -106,6 +291,106 @@ ParsedProject Parser::parseProject(const std::vector<std::filesystem::path>& ent
     ParsedProject project;
     for (const auto& path : discovered) {
         project.files.push_back(parseFile(path));
+    }
+    return project;
+}
+
+// Candidate pool, enumerated once up front: recursive this time (unlike
+// DirectoryScan), because references routinely point deeper. Sorted for
+// deterministic discovery order; already-parsed files excluded.
+std::vector<std::filesystem::path> enumerateCandidates(
+    const std::vector<std::filesystem::path>& entryPoints,
+    const std::set<std::filesystem::path>& parsed) {
+    std::set<std::filesystem::path> searchDirs;
+    for (const auto& entry : entryPoints) {
+        const std::filesystem::path directory = entry.parent_path();
+        searchDirs.insert(directory.empty() ? std::filesystem::current_path()
+                                            : normalizePath(directory));
+    }
+    std::vector<std::filesystem::path> candidates;
+    for (const auto& directory : searchDirs) {
+        for (const auto& candidate :
+             std::filesystem::recursive_directory_iterator(directory)) {
+            if (candidate.is_regular_file() && isArxmlFile(candidate.path())) {
+                const std::filesystem::path normalized = normalizePath(candidate.path());
+                if (!parsed.contains(normalized)) {
+                    candidates.push_back(normalized);
+                }
+            }
+        }
+    }
+    std::ranges::sort(candidates);
+    return candidates;
+}
+
+enum class ExpansionStep : std::uint8_t { Complete, Advanced, Stuck };
+
+// One fixpoint round: parse every candidate that plausibly defines a still-
+// missing name. Complete = nothing missing; Advanced = project grew (scan
+// again — the new files may want more); Stuck = nothing left to find.
+template <typename ParseFileFn>
+ExpansionStep expandProjectOnce(ParsedProject& project,
+                                const std::vector<std::filesystem::path>& candidates,
+                                std::set<std::filesystem::path>& parsed,
+                                const ParseFileFn& parse) {
+    const WantedRefs wanted = collectWantedRefs(project);
+    if (wanted.empty()) {
+        return ExpansionStep::Complete;
+    }
+    bool added = false;
+    for (const auto& candidate : candidates) {
+        if (parsed.contains(candidate)) {
+            continue;
+        }
+        if (!candidateDefinesAny(candidate, wanted)) {
+            continue;
+        }
+        try {
+            ParsedFile file = parse(candidate);
+            if (!definesWantedName(file, wanted)) {
+                continue;  // Pre-filter false positive (e.g. name in a comment).
+            }
+            parsed.insert(candidate);
+            project.files.push_back(std::move(file));
+            added = true;
+        } catch (const std::exception&) {
+            // Discovery probes opportunistically: an unparseable candidate is
+            // skipped, not fatal. If it was actually required, its ref stays
+            // unresolved and surfaces below as DanglingFileReference.
+            continue;
+        }
+    }
+    return added ? ExpansionStep::Advanced : ExpansionStep::Stuck;
+}
+
+ParsedProject Parser::parseProjectLazy(const std::vector<std::filesystem::path>& entryPoints) const {
+    ParsedProject project;
+    std::set<std::filesystem::path> parsed;
+    for (const auto& entry : entryPoints) {
+        project.files.push_back(parseFile(entry));
+        parsed.insert(normalizePath(entry));
+    }
+    std::set<std::filesystem::path> searchDirs;
+    for (const auto& entry : entryPoints) {
+        const std::filesystem::path directory = entry.parent_path();
+        searchDirs.insert(directory.empty() ? std::filesystem::current_path()
+                                            : normalizePath(directory));
+    }
+    const std::vector<std::filesystem::path> candidates =
+        enumerateCandidates(entryPoints, parsed);
+
+    for (int iteration = 0; iteration < kMaxLazyIterations; ++iteration) {
+        const ExpansionStep step = expandProjectOnce(
+            project, candidates, parsed,
+            [this](const std::filesystem::path& path) { return parseFile(path); });
+        if (step != ExpansionStep::Advanced) {
+            break;
+        }
+    }
+    const WantedRefs wanted = collectWantedRefs(project);
+    if (!wanted.empty()) {
+        const std::vector<std::filesystem::path> dirs(searchDirs.begin(), searchDirs.end());
+        throw DanglingFileReferenceError(flattenWanted(wanted), dirs);
     }
     return project;
 }

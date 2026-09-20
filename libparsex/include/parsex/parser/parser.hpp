@@ -6,10 +6,16 @@
 #include <parsex/model/parsed_file.hpp>
 #include <parsex/model/parsed_project.hpp>
 
-// How parseProject() finds the files that make up a project. DirectoryScan
-// is a single-level sibling scan (no recursion — recursive needs are served
-// by LazyOnReference, driven by actual cross-file references). LazyOnReference
-// arrives in a later subtask.
+// How parseProject() finds the files that make up a project:
+// - ExplicitList: exactly entryPoints, nothing more.
+// - DirectoryScan: plus every .arxml sibling (case-insensitive, single level,
+//   deduped) of each entry point's directory. Non-recursive by design.
+// - LazyOnReference: entry points first, then only files defining short names
+//   that parsed content actually references (searched recursively). Fixpoint
+//   expansion capped at 50 iterations; leftovers throw
+//   DanglingFileReferenceError. Candidates that fail to parse are skipped
+//   during discovery (a required-but-broken file surfaces as a dangling ref
+//   naming it); unreadable search trees still fail fast.
 enum class FileDiscoveryMode { ExplicitList, DirectoryScan, LazyOnReference };
 
 // Stateless Parser: no shared mutable state across calls, so parseFile() is
@@ -32,8 +38,11 @@ public:
     // Parses a whole project and collects the results into ParsedProject.files,
     // in deterministic order. ExplicitList parses exactly entryPoints;
     // DirectoryScan adds every .arxml sibling (case-insensitive, single
-    // level, deduped) of each entry point's directory. Cross-file reference
-    // resolution is a later subtask — resolvedRefs stays empty.
+    // level, deduped) of each entry point's directory; LazyOnReference pulls
+    // in only files that define referenced-but-undefined short names
+    // (recursive search, capped fixpoint — see FileDiscoveryMode).
+    // Cross-file reference resolution is a later subtask — resolvedRefs
+    // stays empty in all modes.
     //
     // Whole-call failure (v1 default, documented choice): if any single file
     // fails, its exception propagates and the entire call fails. A project
@@ -42,4 +51,8 @@ public:
     // per-file errors remain a possible future relaxation.
     ParsedProject parseProject(const std::vector<std::filesystem::path>& entryPoints,
                                FileDiscoveryMode mode) const;
+
+private:
+    ParsedProject parseProjectLazy(
+        const std::vector<std::filesystem::path>& entryPoints) const;
 };
