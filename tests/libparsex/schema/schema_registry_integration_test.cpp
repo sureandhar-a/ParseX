@@ -170,14 +170,26 @@ TEST(SchemaRegistryIntegrationTest, TellsConformantApartFromNonConformant) {
     setEnv("XDG_CACHE_HOME", scratchRoot.string());
     setEnv("PARSEX_SCHEMA_DIR", PARSEX_SCHEMA_DIR);
 
-    const std::optional<SchemaResolutionResult> resolved = tryResolve();
-    if (!resolved.has_value()) {
+    const std::optional<SchemaResolutionResult> miss = tryResolve();
+    if (!miss.has_value()) {
         GTEST_SKIP() << "user-supplied 4.2.2 schema not present";
     }
-    ASSERT_NE(resolved->schema.schemaHandle, nullptr);
+    EXPECT_FALSE(miss->wasCacheHit);
+    ASSERT_NE(miss->schema.schemaHandle, nullptr);
 
-    expectValidatesCleanly(resolved->schema.schemaHandle, "schema_valid.arxml");
-    expectFailsValidation(resolved->schema.schemaHandle, "schema_invalid.arxml");
+    // Second call: pure cache hit — no source dependency, fresh parse of the
+    // cache entry. Each call owns an independent schema object.
+    const SchemaResolutionResult hit = resolveSchema("4.2.2");
+    EXPECT_TRUE(hit.wasCacheHit);
+    ASSERT_NE(hit.schema.schemaHandle, nullptr);
+    EXPECT_NE(hit.schema.schemaHandle.get(), miss->schema.schemaHandle.get());
+
+    // Destruction order exercised below (verified by ASan/UBSan, not by
+    // asserts): each helper's valid-ctxt dies before its doc, which dies
+    // before the shared schemas; the parser contexts died inside
+    // resolveSchema() long before any of this.
+    expectValidatesCleanly(hit.schema.schemaHandle, "schema_valid.arxml");
+    expectFailsValidation(hit.schema.schemaHandle, "schema_invalid.arxml");
 
     std::filesystem::remove_all(scratchRoot, errCode);
 }
