@@ -13,6 +13,8 @@
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
+#include <share.h>      // _SH_DENYWR (MinGW doesn't expose it via <io.h>)
+#include <sys/stat.h>   // _S_IREAD/_S_IWRITE (ditto)
 #else
 #include <fcntl.h>
 #include <unistd.h>
