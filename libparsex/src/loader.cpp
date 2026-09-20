@@ -502,6 +502,18 @@ void onStartElement(void* userData, const xmlChar* localName, const xmlChar* pre
         state->stack.push_back(entered);
     }
 }
+void onCharacters(void* userData, const xmlChar* chars, int len) {
+    auto* state = static_cast<LoaderState*>(userData);
+    if (state->stack.empty() || len <= 0) {
+        return;
+    }
+    // Accumulates (SAX may split one text run into several callbacks).
+    // Entity references arrive substituted, CDATA content arrives here too.
+    const auto* first =
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): xmlChar character bounds from libxml2.
+        reinterpret_cast<const char*>(chars);
+    state->stack.back()->text.append(first, static_cast<std::size_t>(len));
+}
 
 void onEndElement(void* userData, const xmlChar* /*localName*/, const xmlChar* /*prefix*/,
                   const xmlChar* /*uri*/) {
@@ -553,6 +565,7 @@ RawDocument loadRawDocument(const std::filesystem::path& path) {
     xmlSAXHandler sax{};
     sax.startElementNs = &onStartElement;
     sax.endElementNs = &onEndElement;
+    sax.characters = &onCharacters;
     sax.initialized = XML_SAX2_MAGIC;
     // Copy into libxml2's own struct: re-pointing ctxt->sax at stack memory
     // makes xmlFreeParserCtxt() free it (SIGABRT at cleanup, seen in the spike).

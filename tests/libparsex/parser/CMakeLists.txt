@@ -3,6 +3,7 @@ add_executable(parser_tests
     secure_reader_test.cpp
     loader_test.cpp
     release_detector_test.cpp
+    model_builder_test.cpp
 )
 
 target_link_libraries(

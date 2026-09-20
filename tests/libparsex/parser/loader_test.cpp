@@ -69,6 +69,19 @@ void expectParentLinks(const RawNode& node) {
     }
 }
 
+const RawNode* findDescendant(const RawNode& node, const std::string& tag) {
+    if (node.tagName == tag) {
+        return &node;
+    }
+    for (const auto& child : node.children) {
+        const RawNode* found = findDescendant(*child, tag);
+        if (found != nullptr) {
+            return found;
+        }
+    }
+    return nullptr;
+}
+
 }  // namespace
 
 TEST(LoaderTest, BasicFixtureTreeShape) {
@@ -228,8 +241,20 @@ TEST(LoaderTest, RealWorldFileLoadsWithExactStructure) {
     EXPECT_EQ(slice(bytes, doc.root.span), bytes.substr(42, bytes.size() - 43));
 }
 
-TEST(LoaderTest, MissingFileThrows) {
-    EXPECT_THROW(loadRawDocument(fixture("does-not-exist.arxml")), std::runtime_error);
+TEST(LoaderTest, CharacterDataCapturedAsNodeText) {
+    const RawDocument basic = loadRawDocument(fixture("loader_basic.arxml"));
+    const RawNode* shortName = findDescendant(basic.root, "SHORT-NAME");
+    ASSERT_NE(shortName, nullptr);
+    EXPECT_EQ(shortName->text, "CanCluster");
+
+    // Self-closed tags see no character callbacks: text stays empty.
+    const RawDocument nested = loadRawDocument(fixture("loader_nested.arxml"));
+    const RawNode* empty = findDescendant(nested.root, "EMPTY");
+    ASSERT_NE(empty, nullptr);
+    EXPECT_EQ(empty->text, "");
+}
+
+TEST(LoaderTest, MissingFileThrows) {    EXPECT_THROW(loadRawDocument(fixture("does-not-exist.arxml")), std::runtime_error);
 }
 
 TEST(LoaderTest, IllFormedFileThrows) {
