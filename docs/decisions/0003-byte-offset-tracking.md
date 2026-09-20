@@ -59,3 +59,25 @@
   `spikes/` probes — full measurements in `spikes/byte_offset_NOTES.md`) or a user
   splicing bug report (this ADR preserves the original numbers so the spike need not
   be redone).
+
+- Amendment — 2.15.3 re-measurement: positions are transcoded units, scan raw bytes
+  instead (2026-09-20): the spike above ran against system libxml2 2.9.13, but the
+  build links vcpkg libxml2 2.15.3, whose input layer was reworked
+  (`xmlByteConsumed()` deprecated; `xmlCtxtGetInputPosition()` /
+  `xmlCtxtGetInputWindow()` are the sanctioned replacements). Re-running the SAX
+  probes against 2.15.3, calling the sanctioned API inside the callbacks:
+  - UTF-8: identical to 2.9.13 (bytePos 47, 63, 80, 99 at START; 123, 141, 158, 169
+    at END) — the transcode is identity, so nothing changes.
+  - Latin-1: START bytePos 52, 101, 118, 137 vs true end-`>` 52, 99, 116, 135 —
+    drift of exactly +2, the two `é` bytes (1 raw byte → 2 UTF-8 bytes) in the
+    comment preceding the measured elements. END anchors likewise sit +1 past `>`
+    in transcoded space. Proof the counter tracks transcoded units, not raw bytes.
+  - UTF-16: all 8 anchors fit bytePos = 2 (raw BOM bytes) + transcoded UTF-8 offset
+    (+1 past `>` at END) — fully transcoded.
+  Refined decision: the Loader uses NO libxml2 position API at all. SAX events
+  supply structure, names, and attributes; a small width-aware raw-byte scanner
+  locates each span boundary, asserting every expected tag name (fail loud on
+  divergence). This is exact on both 2.9 and 2.15 in every tested encoding, with no
+  version-coupled anchor math. The rejections above (reader loop, custom byte
+  counter) stand; only the "in-callback anchor + backward scan" mechanism is
+  superseded.

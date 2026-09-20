@@ -5,6 +5,7 @@ add_library(libparsex STATIC
     src/atomic_write.cpp
     src/schema_registry.cpp
     src/secure_reader.cpp
+    src/loader.cpp
 )
 
 # Tell targets linking against libparsex where to find its header files
