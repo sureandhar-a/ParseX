@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <future>
 
 namespace {
 
@@ -114,4 +115,36 @@ TEST(ValidateSchemaTest, BrokenFixtureErrorCarriesByteSpan) {
 
     std::error_code ignored;
     std::filesystem::remove(path, ignored);
+}
+
+// PAR-101: shared xmlSchema* is safe for concurrent validateSchema() calls
+// because each call mints its own valid-context. Would catch vctxt-sharing.
+TEST(ValidateSchemaTest, ConcurrentCallsShareOneSchemaSafely) {
+    XmlSchemaPtr schema = loadMiniSchema();
+    ASSERT_NE(schema, nullptr);
+    const auto validPath = writeTemp("parsex_validator_conc_valid.xml", kValidMini);
+    const auto brokenPath = writeTemp("parsex_validator_conc_broken.xml", kBrokenMini);
+
+    ParsedFile validFile;
+    validFile.sourcePath = validPath;
+    ParsedFile brokenFile;
+    brokenFile.sourcePath = brokenPath;
+    const Validator validator;
+    ::xmlSchema* shared = schema.get();
+
+    auto runValid = std::async(std::launch::async, [&] {
+        return validator.validateSchema(validFile, shared);
+    });
+    auto runBroken = std::async(std::launch::async, [&] {
+        return validator.validateSchema(brokenFile, shared);
+    });
+    const ValidationResult validResult = runValid.get();
+    const ValidationResult brokenResult = runBroken.get();
+
+    EXPECT_FALSE(validResult.hasErrors());
+    EXPECT_TRUE(brokenResult.hasErrors());
+
+    std::error_code ignored;
+    std::filesystem::remove(validPath, ignored);
+    std::filesystem::remove(brokenPath, ignored);
 }
