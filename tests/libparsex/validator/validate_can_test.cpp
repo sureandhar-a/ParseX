@@ -177,3 +177,37 @@ TEST(CanOverlapTest, OverlappingMotorolaSignalsFail) {
     ASSERT_EQ(result.errors.size(), 1U);
     EXPECT_EQ(result.errors.front().code, "can.signal_overlap");
 }
+
+// PAR-111: consolidated pass — every category through validateCanSemantics().
+TEST(CanSemanticsIntegrationTest, MixedValidPduIsClean) {
+    // 8-byte PDU, four packed signals mixing Intel and Motorola, no gaps
+    // overlapping: Intel A=[0,8), Intel B=[8,16), Motorola C=byte2 (MSB 23),
+    // Motorola D=byte3 (MSB 31).
+    Pdu pdu = makePdu("Mixed", 8);
+    pdu.signalMappings.push_back(
+        makeMapping("A", 0, ByteOrder::LeastSignificantByteFirst));
+    pdu.signalMappings.push_back(
+        makeMapping("B", 8, ByteOrder::LeastSignificantByteFirst));
+    pdu.signalMappings.push_back(
+        makeMapping("C", 23, ByteOrder::MostSignificantByteFirst));
+    pdu.signalMappings.push_back(
+        makeMapping("D", 31, ByteOrder::MostSignificantByteFirst));
+    auto project = projectWithPdu(
+        pdu,
+        {makeSignal("A", 8), makeSignal("B", 8), makeSignal("C", 8), makeSignal("D", 8)});
+    const ValidationResult result = Validator{}.validateCanSemantics(project);
+    EXPECT_TRUE(result.errors.empty());
+}
+
+TEST(CanSemanticsIntegrationTest, DlcMismatchAndOverlapReportedTogether) {
+    Pdu pdu = makePdu("Bad", 40);  // invalid length and overlapping pair
+    pdu.signalMappings.push_back(
+        makeMapping("A", 0, ByteOrder::LeastSignificantByteFirst));
+    pdu.signalMappings.push_back(
+        makeMapping("B", 4, ByteOrder::LeastSignificantByteFirst));
+    auto project = projectWithPdu(pdu, {makeSignal("A", 8), makeSignal("B", 8)});
+    const ValidationResult result = Validator{}.validateCanSemantics(project);
+    ASSERT_EQ(result.errors.size(), 2U);
+    EXPECT_EQ(result.errors[0].code, "can.dlc_mismatch");
+    EXPECT_EQ(result.errors[1].code, "can.signal_overlap");
+}
