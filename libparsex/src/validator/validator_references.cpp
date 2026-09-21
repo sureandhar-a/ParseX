@@ -1,6 +1,8 @@
 #include <parsex/validator/validator.hpp>
 
+#include <algorithm>
 #include <optional>
+#include <ranges>
 #include <vector>
 
 #include <parsex/raw/raw_node.hpp>
@@ -68,6 +70,33 @@ void collectRefs(const RawNode& node, std::vector<const RawNode*>& out) {
     }
 }
 
+// DEST -> acceptable XML tags, scoped to the CAN-stack subset ParseX models.
+// Aliases included (FRAME/CAN-FRAME, PDU/I-SIGNAL-I-PDU, ...) per the
+// Protocol Model Builder's accepted tags — grep the XSDs before extending.
+const std::map<std::string, std::vector<std::string>>& destToTags() {
+    static const std::map<std::string, std::vector<std::string>> kTable = {
+        {"FRAME", {"FRAME", "CAN-FRAME"}},
+        {"PDU", {"PDU", "I-SIGNAL-I-PDU"}},
+        {"PDU-TRIGGERING", {"PDU-TRIGGERING"}},
+        {"I-SIGNAL", {"I-SIGNAL"}},
+        {"I-SIGNAL-GROUP", {"I-SIGNAL-GROUP", "SIGNAL-GROUP"}},
+        {"SYSTEM-SIGNAL", {"SYSTEM-SIGNAL"}},
+        {"SIGNAL-GROUP", {"SIGNAL-GROUP", "I-SIGNAL-GROUP"}},
+        {"ECU-INSTANCE", {"ECU-INSTANCE"}},
+        {"PHYSICAL-CHANNEL", {"PHYSICAL-CHANNEL", "CAN-PHYSICAL-CHANNEL"}},
+    };
+    return kTable;
+}
+
+bool tagMatchesDest(const std::string& actualTag, const std::string& dest) {
+    const auto& table = destToTags();
+    const auto it = table.find(dest);
+    if (it == table.end()) {
+        return true;  // unrecognized DEST handled as warning by caller
+    }
+    return std::ranges::find(it->second, actualTag) != it->second.end();
+}
+
 }  // namespace
 
 std::map<std::string, const RawNode*> Validator::buildReferencePathIndex(
@@ -82,8 +111,8 @@ std::map<std::string, const RawNode*> Validator::buildReferencePathIndex(
     return index;
 }
 
-// PAR-103: path lookup + dangling detection. DEST type-checking is PAR-104's
-// job — a resolving-but-wrong-type REF must NOT be flagged as dangling here.
+// PAR-103: path lookup + dangling detection. PAR-104: DEST type-check on top
+// (two-step autosar-data algorithm: lookup, then type compare).
 ValidationResult Validator::validateReferences(const ParsedProject& project) const {
     ValidationResult result;
     const auto index = buildReferencePathIndex(project);
@@ -98,16 +127,46 @@ ValidationResult Validator::validateReferences(const ParsedProject& project) con
             if (path.empty()) {
                 continue;  // malformed ref with no target: not file-resolvable
             }
-            if (index.find(path) != index.end()) {
-                continue;  // resolves — type-check belongs to PAR-104
+            const auto target = index.find(path);
+            if (target == index.end()) {
+                ValidationError finding;
+                finding.severity = Severity::Error;
+                finding.code = "ref.dangling";
+                finding.message = "dangling reference to '" + path + "'";
+                finding.location = ref->span;
+                finding.path = path;
+                result.errors.push_back(std::move(finding));
+                continue;
             }
-            ValidationError finding;
-            finding.severity = Severity::Error;
-            finding.code = "ref.dangling";
-            finding.message = "dangling reference to '" + path + "'";
-            finding.location = ref->span;
-            finding.path = path;
-            result.errors.push_back(std::move(finding));
+            // Step two: DEST type compare.
+            const std::string dest = destAttr(*ref).value();
+            const auto& table = destToTags();
+            if (table.find(dest) == table.end()) {
+                // CAN-subset table only: unrecognized DEST on non-CAN refs
+                // must not block validation of what ParseX understands.
+                ValidationError finding;
+                finding.severity = Severity::Warning;
+                finding.code = "ref.dest_unrecognized";
+                finding.message = "unrecognized DEST '" + dest + "' for '" + path + "'";
+                finding.location = ref->span;
+                finding.path = path;
+                finding.expectedType = dest;
+                result.errors.push_back(std::move(finding));
+                continue;
+            }
+            const std::string actualTag = target->second->tagName;
+            if (!tagMatchesDest(actualTag, dest)) {
+                ValidationError finding;
+                finding.severity = Severity::Error;
+                finding.code = "ref.type_mismatch";
+                finding.message = "reference to '" + path + "' expects DEST '" + dest +
+                                  "' but resolves to <" + actualTag + ">";
+                finding.location = ref->span;
+                finding.path = path;
+                finding.expectedType = dest;
+                finding.actualType = actualTag;
+                result.errors.push_back(std::move(finding));
+            }
         }
     }
     return result;

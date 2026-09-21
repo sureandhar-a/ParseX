@@ -151,3 +151,90 @@ TEST(ValidateReferencesTest, ResolvingRefProducesNoDanglingError) {
     std::error_code ignored;
     std::filesystem::remove(path, ignored);
 }
+
+// PAR-104: DEST type-checking.
+TEST(ValidateReferencesTest, CorrectDestTypeProducesNoError) {
+    constexpr const char* kGood =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<AUTOSAR>\n"
+        "  <AR-PACKAGES>\n"
+        "    <AR-PACKAGE>\n"
+        "      <SHORT-NAME>Pkg</SHORT-NAME>\n"
+        "      <ELEMENTS>\n"
+        "        <CAN-FRAME><SHORT-NAME>F1</SHORT-NAME></CAN-FRAME>\n"
+        "        <FRAME><SHORT-NAME>F2</SHORT-NAME>\n"
+        "          <FRAME-REF DEST=\"FRAME\">/Pkg/F1</FRAME-REF>\n"
+        "        </FRAME>\n"
+        "      </ELEMENTS>\n"
+        "    </AR-PACKAGE>\n"
+        "  </AR-PACKAGES>\n"
+        "</AUTOSAR>\n";
+    const auto path = writeTemp("parsex_ref_goodtype.arxml", kGood);
+    ParsedProject project;
+    project.files.push_back(fileForPath(path));
+
+    const ValidationResult result = Validator{}.validateReferences(project);
+    EXPECT_TRUE(result.errors.empty());
+
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
+}
+
+TEST(ValidateReferencesTest, WrongDestTypeIsReported) {
+    constexpr const char* kBad =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<AUTOSAR>\n"
+        "  <AR-PACKAGES>\n"
+        "    <AR-PACKAGE>\n"
+        "      <SHORT-NAME>Pkg</SHORT-NAME>\n"
+        "      <ELEMENTS>\n"
+        "        <I-SIGNAL><SHORT-NAME>S1</SHORT-NAME></I-SIGNAL>\n"
+        "        <FRAME><SHORT-NAME>F1</SHORT-NAME>\n"
+        "          <PDU-REF DEST=\"PDU-TRIGGERING\">/Pkg/S1</PDU-REF>\n"
+        "        </FRAME>\n"
+        "      </ELEMENTS>\n"
+        "    </AR-PACKAGE>\n"
+        "  </AR-PACKAGES>\n"
+        "</AUTOSAR>\n";
+    const auto path = writeTemp("parsex_ref_badtype.arxml", kBad);
+    ParsedProject project;
+    project.files.push_back(fileForPath(path));
+
+    const ValidationResult result = Validator{}.validateReferences(project);
+    ASSERT_EQ(result.errors.size(), 1U);
+    EXPECT_EQ(result.errors.front().code, "ref.type_mismatch");
+    EXPECT_EQ(result.errors.front().severity, Severity::Error);
+
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
+}
+
+TEST(ValidateReferencesTest, UnrecognizedDestIsWarningOnly) {
+    constexpr const char* kUnknown =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<AUTOSAR>\n"
+        "  <AR-PACKAGES>\n"
+        "    <AR-PACKAGE>\n"
+        "      <SHORT-NAME>Pkg</SHORT-NAME>\n"
+        "      <ELEMENTS>\n"
+        "        <CLUSTER><SHORT-NAME>C1</SHORT-NAME></CLUSTER>\n"
+        "        <FRAME><SHORT-NAME>F1</SHORT-NAME>\n"
+        "          <FOO-REF DEST=\"SOME-FUTURE-CLASS\">/Pkg/C1</FOO-REF>\n"
+        "        </FRAME>\n"
+        "      </ELEMENTS>\n"
+        "    </AR-PACKAGE>\n"
+        "  </AR-PACKAGES>\n"
+        "</AUTOSAR>\n";
+    const auto path = writeTemp("parsex_ref_unknowndest.arxml", kUnknown);
+    ParsedProject project;
+    project.files.push_back(fileForPath(path));
+
+    const ValidationResult result = Validator{}.validateReferences(project);
+    ASSERT_EQ(result.errors.size(), 1U);
+    EXPECT_EQ(result.errors.front().code, "ref.dest_unrecognized");
+    EXPECT_EQ(result.errors.front().severity, Severity::Warning);
+    EXPECT_FALSE(result.hasErrors());
+
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
+}
