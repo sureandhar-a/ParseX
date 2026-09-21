@@ -238,3 +238,54 @@ TEST(ValidateReferencesTest, UnrecognizedDestIsWarningOnly) {
     std::error_code ignored;
     std::filesystem::remove(path, ignored);
 }
+
+// PAR-105: integrated pass — dangling, mismatch, and valid same-name case.
+TEST(ValidateReferencesTest, IntegratedDanglingMismatchAndValidSameName) {
+    // Valid project where "Foo" exists under two packages; the REF uses the
+    // full path so a bare-name lookup bug would misresolve it.
+    constexpr const char* kValidSameName =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<AUTOSAR>\n"
+        "  <AR-PACKAGES>\n"
+        "    <AR-PACKAGE><SHORT-NAME>PackageA</SHORT-NAME><ELEMENTS>\n"
+        "      <I-SIGNAL><SHORT-NAME>Foo</SHORT-NAME></I-SIGNAL>\n"
+        "    </ELEMENTS></AR-PACKAGE>\n"
+        "    <AR-PACKAGE><SHORT-NAME>PackageB</SHORT-NAME><ELEMENTS>\n"
+        "      <I-SIGNAL><SHORT-NAME>Foo</SHORT-NAME></I-SIGNAL>\n"
+        "      <FRAME><SHORT-NAME>F1</SHORT-NAME>\n"
+        "        <SIGNAL-REF DEST=\"I-SIGNAL\">/PackageB/Foo</SIGNAL-REF>\n"
+        "      </FRAME>\n"
+        "    </ELEMENTS></AR-PACKAGE>\n"
+        "  </AR-PACKAGES>\n"
+        "</AUTOSAR>\n";
+    const auto validPath = writeTemp("parsex_ref_integ_valid.arxml", kValidSameName);
+    ParsedProject validProject;
+    validProject.files.push_back(fileForPath(validPath));
+    EXPECT_TRUE(Validator{}.validateReferences(validProject).errors.empty());
+    std::error_code ignored;
+    std::filesystem::remove(validPath, ignored);
+
+    // One project mixing a dangling REF and a type-mismatched REF: each
+    // category must appear exactly once, with no cross-contamination.
+    constexpr const char* kMixed =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<AUTOSAR>\n"
+        "  <AR-PACKAGES>\n"
+        "    <AR-PACKAGE><SHORT-NAME>Pkg</SHORT-NAME><ELEMENTS>\n"
+        "      <I-SIGNAL><SHORT-NAME>S1</SHORT-NAME></I-SIGNAL>\n"
+        "      <FRAME><SHORT-NAME>F1</SHORT-NAME>\n"
+        "        <PDU-REF DEST=\"PDU\">/Pkg/Nowhere</PDU-REF>\n"
+        "        <SIGNAL-REF DEST=\"PDU-TRIGGERING\">/Pkg/S1</SIGNAL-REF>\n"
+        "      </FRAME>\n"
+        "    </ELEMENTS></AR-PACKAGE>\n"
+        "  </AR-PACKAGES>\n"
+        "</AUTOSAR>\n";
+    const auto mixedPath = writeTemp("parsex_ref_integ_mixed.arxml", kMixed);
+    ParsedProject mixedProject;
+    mixedProject.files.push_back(fileForPath(mixedPath));
+    const ValidationResult mixed = Validator{}.validateReferences(mixedProject);
+    ASSERT_EQ(mixed.errors.size(), 2U);
+    EXPECT_EQ(mixed.errors[0].code, "ref.dangling");
+    EXPECT_EQ(mixed.errors[1].code, "ref.type_mismatch");
+    std::filesystem::remove(mixedPath, ignored);
+}
