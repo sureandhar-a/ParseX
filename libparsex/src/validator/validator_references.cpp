@@ -1,5 +1,8 @@
 #include <parsex/validator/validator.hpp>
 
+#include <optional>
+#include <vector>
+
 #include <parsex/raw/raw_node.hpp>
 
 namespace {
@@ -41,6 +44,30 @@ void indexNode(const RawNode& node, const std::string& basePath,
     }
 }
 
+bool isRefTag(const std::string& tag) {
+    // AUTOSAR references are XXX-REF (TRANSMITTER-REF, PDU-REF, ...).
+    // Bare "REF" alone is not a reference element.
+    return tag.size() > 4 && tag.compare(tag.size() - 4, 4, "-REF") == 0;
+}
+
+std::optional<std::string> destAttr(const RawNode& node) {
+    for (const auto& attr : node.attributes) {
+        if (attr.first == "DEST") {
+            return attr.second;
+        }
+    }
+    return std::nullopt;
+}
+
+void collectRefs(const RawNode& node, std::vector<const RawNode*>& out) {
+    if (isRefTag(node.tagName) && destAttr(node).has_value()) {
+        out.push_back(&node);
+    }
+    for (const auto& child : node.children) {
+        collectRefs(*child, out);
+    }
+}
+
 }  // namespace
 
 std::map<std::string, const RawNode*> Validator::buildReferencePathIndex(
@@ -55,9 +82,33 @@ std::map<std::string, const RawNode*> Validator::buildReferencePathIndex(
     return index;
 }
 
-// Full REF resolution lives in PAR-103 (dangling) + PAR-104 (DEST check).
-// This stub exists so the header's promise compiles; it delegates to the
-// same index without reporting yet — replaced by the real pass next.
-ValidationResult Validator::validateReferences(const ParsedProject& /*project*/) const {
-    return ValidationResult{};
+// PAR-103: path lookup + dangling detection. DEST type-checking is PAR-104's
+// job — a resolving-but-wrong-type REF must NOT be flagged as dangling here.
+ValidationResult Validator::validateReferences(const ParsedProject& project) const {
+    ValidationResult result;
+    const auto index = buildReferencePathIndex(project);
+    for (const auto& file : project.files) {
+        if (file.rawDocument == nullptr) {
+            continue;
+        }
+        std::vector<const RawNode*> refs;
+        collectRefs(file.rawDocument->root, refs);
+        for (const RawNode* ref : refs) {
+            const std::string path = trimText(ref->text);
+            if (path.empty()) {
+                continue;  // malformed ref with no target: not file-resolvable
+            }
+            if (index.find(path) != index.end()) {
+                continue;  // resolves — type-check belongs to PAR-104
+            }
+            ValidationError finding;
+            finding.severity = Severity::Error;
+            finding.code = "ref.dangling";
+            finding.message = "dangling reference to '" + path + "'";
+            finding.location = ref->span;
+            finding.path = path;
+            result.errors.push_back(std::move(finding));
+        }
+    }
+    return result;
 }

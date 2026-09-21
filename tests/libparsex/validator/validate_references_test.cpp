@@ -90,3 +90,64 @@ TEST(ReferencePathIndexTest, SameNameUnderDifferentPackagesIsDistinct) {
     std::error_code ignored;
     std::filesystem::remove(path, ignored);
 }
+
+// PAR-103: dangling vs resolving REFs are cleanly separated.
+TEST(ValidateReferencesTest, DanglingRefIsReported) {
+    constexpr const char* kDangling =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<AUTOSAR>\n"
+        "  <AR-PACKAGES>\n"
+        "    <AR-PACKAGE>\n"
+        "      <SHORT-NAME>Pkg</SHORT-NAME>\n"
+        "      <ELEMENTS>\n"
+        "        <CLUSTER><SHORT-NAME>Real</SHORT-NAME></CLUSTER>\n"
+        "        <FRAME><SHORT-NAME>F1</SHORT-NAME>\n"
+        "          <PDU-REF DEST=\"PDU\">/Pkg/Missing</PDU-REF>\n"
+        "        </FRAME>\n"
+        "      </ELEMENTS>\n"
+        "    </AR-PACKAGE>\n"
+        "  </AR-PACKAGES>\n"
+        "</AUTOSAR>\n";
+    const auto path = writeTemp("parsex_ref_dangling.arxml", kDangling);
+    ParsedProject project;
+    project.files.push_back(fileForPath(path));
+
+    const ValidationResult result = Validator{}.validateReferences(project);
+    ASSERT_EQ(result.errors.size(), 1U);
+    EXPECT_EQ(result.errors.front().code, "ref.dangling");
+    EXPECT_TRUE(result.errors.front().location.has_value());
+
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
+}
+
+TEST(ValidateReferencesTest, ResolvingRefProducesNoDanglingError) {
+    constexpr const char* kValid =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<AUTOSAR>\n"
+        "  <AR-PACKAGES>\n"
+        "    <AR-PACKAGE>\n"
+        "      <SHORT-NAME>Pkg</SHORT-NAME>\n"
+        "      <ELEMENTS>\n"
+        "        <CLUSTER><SHORT-NAME>Real</SHORT-NAME></CLUSTER>\n"
+        "        <FRAME><SHORT-NAME>F1</SHORT-NAME>\n"
+        "          <PDU-REF DEST=\"PDU\">/Pkg/Real</PDU-REF>\n"
+        "        </FRAME>\n"
+        "      </ELEMENTS>\n"
+        "    </AR-PACKAGE>\n"
+        "  </AR-PACKAGES>\n"
+        "</AUTOSAR>\n";
+    const auto path = writeTemp("parsex_ref_resolving.arxml", kValid);
+    ParsedProject project;
+    project.files.push_back(fileForPath(path));
+
+    const ValidationResult result = Validator{}.validateReferences(project);
+    // Resolving-but-wrong-type is PAR-104's job — no dangling error here.
+    // (DEST "PDU" vs actual "CLUSTER" must not leak into this category.)
+    for (const auto& err : result.errors) {
+        EXPECT_NE(err.code, "ref.dangling") << err.message;
+    }
+
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
+}
