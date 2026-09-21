@@ -3,6 +3,7 @@
 #include <libxml/xmlschemas.h>
 
 #include <map>
+#include <optional>
 #include <string>
 
 #include <parsex/model/parsed_file.hpp>
@@ -43,6 +44,16 @@ public:
 
     // PBI 3: SHORT-NAME unique among direct siblings per parent (PAR-106).
     ValidationResult validateUniqueness(const ParsedProject& project) const;
+
+    // PBI 4: CAN DLC/length + signal-overlap checks (PAR-108..110).
+    // Frame/Pdu carry only `length` (no separate DLC field or FD flag), so
+    // `length` is validated as the declared payload byte length: 0..8 passes
+    // as classic CAN; extended FD lengths pass as CAN FD; anything else
+    // (e.g. 9..11, 40) fails as can.dlc_mismatch.
+    static std::optional<std::uint32_t> canFdBytesForDlc(int dlc);
+    static bool isValidClassicCanLength(std::uint32_t length);
+    static bool isValidCanFdLength(std::uint32_t length);
+    ValidationResult validateCanSemantics(const ParsedProject& project) const;
 
 private:
     static void onSchemaError(void* userData, const xmlError* error);
