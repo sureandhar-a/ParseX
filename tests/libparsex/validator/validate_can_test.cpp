@@ -1,6 +1,7 @@
 // PAR-108: DLC/payload-length validation for classic CAN and CAN FD.
 #include <gtest/gtest.h>
 
+#include <parsex/model/pdu.hpp>
 #include <parsex/validator/validator.hpp>
 
 TEST(CanDlcTest, ClassicLengthsZeroToEightPassFdTableIsExact) {
@@ -60,4 +61,33 @@ TEST(CanDlcTest, FrameAndPduLengthsValidated) {
     for (const auto& err : result.errors) {
         EXPECT_EQ(err.code, "can.dlc_mismatch");
     }
+}
+
+// PAR-109: Intel/Motorola normalization into one comparable bit space.
+TEST(CanBitModelTest, IntelOccupiesAscendingRange) {
+    EXPECT_EQ(Validator::physicalBitsForIntelSignal(0, 8),
+              (std::vector<int>{0, 1, 2, 3, 4, 5, 6, 7}));
+    EXPECT_EQ(Validator::physicalBitsForIntelSignal(16, 4),
+              (std::vector<int>{16, 17, 18, 19}));
+}
+
+TEST(CanBitModelTest, MotorolaSingleByteDescending) {
+    // MSB 7, length 8 -> whole byte 0 in descending LSB0 order.
+    EXPECT_EQ(Validator::physicalBitsForMotorolaSignal(7, 8),
+              (std::vector<int>{7, 6, 5, 4, 3, 2, 1, 0}));
+    EXPECT_EQ(Validator::physicalBitsForMotorolaSignal(15, 8),
+              (std::vector<int>{15, 14, 13, 12, 11, 10, 9, 8}));
+}
+
+TEST(CanBitModelTest, MotorolaCrossesBytesViaMsbWrap) {
+    // MSB 23 (byte 2), length 12 -> byte 2 full + byte 3 upper nibble.
+    EXPECT_EQ(Validator::physicalBitsForMotorolaSignal(23, 12),
+              (std::vector<int>{23, 22, 21, 20, 19, 18, 17, 16, 31, 30, 29, 28}));
+}
+
+TEST(CanBitModelTest, DispatcherHonorsByteOrder) {
+    EXPECT_EQ(Validator::physicalBitsForSignal(ByteOrder::LeastSignificantByteFirst, 0, 4),
+              (std::vector<int>{0, 1, 2, 3}));
+    EXPECT_EQ(Validator::physicalBitsForSignal(ByteOrder::MostSignificantByteFirst, 7, 4),
+              (std::vector<int>{7, 6, 5, 4}));
 }

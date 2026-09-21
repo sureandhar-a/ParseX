@@ -1,6 +1,7 @@
 #include <parsex/validator/validator.hpp>
 
 #include <array>
+#include <vector>
 
 // CAN FD DLC table: non-linear above DLC 8. Fixed lookup, never a formula.
 std::optional<std::uint32_t> Validator::canFdBytesForDlc(int dlc) {
@@ -39,6 +40,48 @@ bool Validator::isValidCanFdLength(std::uint32_t length) {
         default:
             return false;
     }
+}
+
+// Intel/little-endian: LSB-first ascending — occupies [start, start+len).
+std::vector<int> Validator::physicalBitsForIntelSignal(int startBit, int bitLength) {
+    std::vector<int> bits;
+    if (startBit < 0 || bitLength <= 0) {
+        return bits;
+    }
+    bits.reserve(static_cast<std::size_t>(bitLength));
+    for (int idx = 0; idx < bitLength; ++idx) {
+        bits.push_back(startBit + idx);
+    }
+    return bits;
+}
+
+// Motorola/big-endian: LSB0-within-byte but big-endian-overall (bit 7 = MSB
+// of byte 0, byte 1 continues at 15..8). startBit names the MSB; the signal
+// extends toward the LSB, wrapping to the next byte's MSB at byte edges.
+std::vector<int> Validator::physicalBitsForMotorolaSignal(int startBit, int bitLength) {
+    std::vector<int> bits;
+    if (startBit < 0 || bitLength <= 0) {
+        return bits;
+    }
+    bits.reserve(static_cast<std::size_t>(bitLength));
+    int pos = startBit;
+    for (int idx = 0; idx < bitLength; ++idx) {
+        bits.push_back(pos);
+        if (pos % 8 == 0) {
+            pos += 15;  // LSB of byte N -> MSB of byte N+1
+        } else {
+            --pos;
+        }
+    }
+    return bits;
+}
+
+std::vector<int> Validator::physicalBitsForSignal(ByteOrder byteOrder, int startBit,
+                                                  int bitLength) {
+    if (byteOrder == ByteOrder::LeastSignificantByteFirst) {
+        return physicalBitsForIntelSignal(startBit, bitLength);
+    }
+    return physicalBitsForMotorolaSignal(startBit, bitLength);
 }
 
 namespace {

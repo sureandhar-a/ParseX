@@ -53,6 +53,16 @@ public:
     static std::optional<std::uint32_t> canFdBytesForDlc(int dlc);
     static bool isValidClassicCanLength(std::uint32_t length);
     static bool isValidCanFdLength(std::uint32_t length);
+    // PBI 4 bit-occupancy normalization (PAR-109): each converts
+    // (startBit, bitLength) into the same flat physical-bit-index space so
+    // Intel and Motorola signals are directly comparable. Kept as separate
+    // functions so the two numbering conventions are independently testable
+    // (a byte-order conversion bug here caused a real false-overlap report
+    // in cantools issue #412).
+    static std::vector<int> physicalBitsForIntelSignal(int startBit, int bitLength);
+    static std::vector<int> physicalBitsForMotorolaSignal(int startBit, int bitLength);
+    static std::vector<int> physicalBitsForSignal(ByteOrder byteOrder, int startBit,
+                                                  int bitLength);
     ValidationResult validateCanSemantics(const ParsedProject& project) const;
 
 private:
