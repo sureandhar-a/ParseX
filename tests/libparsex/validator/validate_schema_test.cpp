@@ -1,7 +1,8 @@
 // PAR-99: validateSchema() plumbing — valid fixture is clean, broken fixture
-// reports structured errors. Location attribution is PAR-100's job.
+// reports structured errors. PAR-100 adds location attribution on top.
 #include <gtest/gtest.h>
 
+#include <parsex/parser/loader.hpp>
 #include <parsex/schema/xml_schema_raii.hpp>
 #include <parsex/validator/validator.hpp>
 
@@ -76,4 +77,41 @@ TEST(ValidateSchemaTest, NullSchemaReportsError) {
     file.sourcePath = fixture("tiny_valid.arxml");
     const ValidationResult result = Validator{}.validateSchema(file, nullptr);
     EXPECT_TRUE(result.hasErrors());
+}
+
+// PAR-100: error location maps back to a RawSpan in the source file.
+TEST(ValidateSchemaTest, BrokenFixtureErrorCarriesByteSpan) {
+    XmlSchemaPtr schema = loadMiniSchema();
+    ASSERT_NE(schema, nullptr);
+    // Multi-line file so the line->span lookup has something to resolve.
+    const std::string broken =
+        std::string("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n") +
+        "<MiniRoot xmlns=\"http://parsex.test/mini\">\n" + "  <Child/>\n" +
+        "</MiniRoot>\n";
+    const auto path = writeTemp("parsex_validator_span.xml", broken);
+
+    ParsedFile file;
+    file.sourcePath = path;
+    file.rawDocument =
+        std::make_shared<RawDocument>(loadRawDocument(path));
+    const ValidationResult result = Validator{}.validateSchema(file, schema.get());
+    ASSERT_TRUE(result.hasErrors());
+    ASSERT_TRUE(result.errors.front().location.has_value())
+        << "expected byte span, got none: " << result.errors.front().message;
+    const RawSpan span = result.errors.front().location.value();
+    EXPECT_LT(span.startOffset, span.endOffset);
+    EXPECT_GT(span.lineNumber, 0U);
+
+    std::ifstream input(path, std::ios::binary);
+    const std::string bytes{std::istreambuf_iterator<char>(input),
+                            std::istreambuf_iterator<char>()};
+    ASSERT_LT(span.endOffset, bytes.size());
+    // The span must slice real element text (not whitespace): it should
+    // contain a '<' within a few bytes of its start.
+    const std::string window =
+        bytes.substr(span.startOffset, std::min<std::size_t>(32, bytes.size() - span.startOffset));
+    EXPECT_NE(window.find('<'), std::string::npos) << "window: " << window;
+
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
 }

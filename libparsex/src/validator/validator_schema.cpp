@@ -7,6 +7,10 @@
 #include <parsex/raw/raw_document.hpp>
 #include <parsex/schema/xml_schema_raii.hpp>
 
+#include <algorithm>
+#include <optional>
+#include <ranges>
+
 namespace {
 
 std::string trimMessage(const char* raw) {
@@ -21,11 +25,67 @@ std::string trimMessage(const char* raw) {
     return message;
 }
 
+// Sorted (line -> span) index over one RawDocument. The Span-Tracking Loader
+// already records RawSpan::lineNumber per node, so no second parse pass is
+// needed — just flatten the tree. error->node is deliberately NOT trusted:
+// it points into the throwaway re-parsed xmlDoc, not our RawNode tree, and
+// occurrence-constraint violations can misattribute it to the wrong sibling.
+using LineIndex = std::vector<std::pair<int, RawSpan>>;
+
+void collectLineEntries(const RawNode& node, LineIndex& out) {
+    if (node.span.lineNumber > 0) {
+        out.emplace_back(static_cast<int>(node.span.lineNumber), node.span);
+    }
+    for (const auto& child : node.children) {
+        collectLineEntries(*child, out);
+    }
+}
+
+LineIndex buildLineIndex(const RawNode& root) {
+    LineIndex index;
+    collectLineEntries(root, index);
+    std::ranges::sort(index, [](const auto& a, const auto& b) {
+        if (a.first != b.first) {
+            return a.first < b.first;
+        }
+        return a.second.startOffset < b.second.startOffset;
+    });
+    return index;
+}
+
+std::optional<RawSpan> spanForLine(const LineIndex& index, int line) {
+    if (index.empty() || line <= 0) {
+        return std::nullopt;
+    }
+    const auto it =
+        std::ranges::lower_bound(index, line, {}, &std::pair<int, RawSpan>::first);
+    if (it == index.end()) {
+        return index.back().second;
+    }
+    if (it->first == line) {
+        return it->second;
+    }
+    if (it == index.begin()) {
+        return it->second;
+    }
+    const auto& higher = *it;
+    const auto& lower = *(it - 1);
+    const int loDist = line - lower.first;
+    const int hiDist = higher.first - line;
+    // Tie -> predecessor (the element whose start encloses the error line).
+    return (hiDist < loDist) ? higher.second : lower.second;
+}
+
+struct SchemaErrorContext {
+    ValidationResult* result = nullptr;
+    const LineIndex* lineIndex = nullptr;
+};
+
 }  // namespace
 
 void Validator::onSchemaError(void* userData, const xmlError* error) {
-    auto* result = static_cast<ValidationResult*>(userData);
-    if (result == nullptr || error == nullptr) {
+    auto* ctx = static_cast<SchemaErrorContext*>(userData);
+    if (ctx == nullptr || ctx->result == nullptr || error == nullptr) {
         return;
     }
     ValidationError finding;
@@ -33,8 +93,11 @@ void Validator::onSchemaError(void* userData, const xmlError* error) {
         (error->level == XML_ERR_WARNING) ? Severity::Warning : Severity::Error;
     finding.code = "schema.invalid";
     finding.message = trimMessage(error->message);
-    // Location attribution is PAR-100's job — left unset here by design.
-    result->errors.push_back(std::move(finding));
+    // error->int2 (column) is best-effort only — not used for span lookup.
+    if (ctx->lineIndex != nullptr) {
+        finding.location = spanForLine(*ctx->lineIndex, error->line);
+    }
+    ctx->result->errors.push_back(std::move(finding));
 }
 
 ValidationResult Validator::validateSchema(const ParsedFile& file,
@@ -62,7 +125,13 @@ ValidationResult Validator::validateSchema(const ParsedFile& file,
         return result;
     }
     // Structured (not printf-style) errors: callback gets xmlErrorPtr directly.
-    xmlSchemaSetValidStructuredErrors(vctxt.get(), &Validator::onSchemaError, &result);
+    // Line-based lookup against our own tree (never error->node identity).
+    LineIndex lineIndex;
+    if (file.rawDocument != nullptr) {
+        lineIndex = buildLineIndex(file.rawDocument->root);
+    }
+    SchemaErrorContext ctx{.result = &result, .lineIndex = &lineIndex};
+    xmlSchemaSetValidStructuredErrors(vctxt.get(), &Validator::onSchemaError, &ctx);
 
     const std::string narrowPath = file.sourcePath.string();
     XmlDocPtr doc(xmlReadFile(narrowPath.c_str(), nullptr, XML_PARSE_NONET));
