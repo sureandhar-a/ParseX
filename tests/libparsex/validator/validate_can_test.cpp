@@ -91,3 +91,89 @@ TEST(CanBitModelTest, DispatcherHonorsByteOrder) {
     EXPECT_EQ(Validator::physicalBitsForSignal(ByteOrder::MostSignificantByteFirst, 7, 4),
               (std::vector<int>{7, 6, 5, 4}));
 }
+
+namespace {
+
+ParsedProject projectWithPdu(const Pdu& pdu, const std::vector<Signal>& signals) {
+    ParsedFile file;
+    file.pdus.push_back(pdu);
+    for (const auto& signal : signals) {
+        file.signals.push_back(signal);
+    }
+    ParsedProject project;
+    project.files.push_back(file);
+    return project;
+}
+
+Signal makeSignal(const std::string& name, std::uint32_t bitLength) {
+    Signal signal;
+    signal.common.shortName = name;
+    signal.bitLength = bitLength;
+    return signal;
+}
+
+Pdu makePdu(const std::string& name, std::uint32_t length) {
+    Pdu pdu;
+    pdu.common.shortName = name;
+    pdu.length = length;
+    return pdu;
+}
+
+PduSignalMapping makeMapping(const std::string& signal, std::uint32_t start,
+                             ByteOrder order) {
+    PduSignalMapping mapping;
+    mapping.signalShortNameRef = signal;
+    mapping.startPosition = start;
+    mapping.byteOrder = order;
+    return mapping;
+}
+
+}  // namespace
+
+// PAR-110: overlap detection on the occupancy model.
+TEST(CanOverlapTest, DisjointIntelSignalsPass) {
+    Pdu pdu = makePdu("P", 8);
+    pdu.signalMappings.push_back(
+        makeMapping("A", 0, ByteOrder::LeastSignificantByteFirst));
+    pdu.signalMappings.push_back(
+        makeMapping("B", 16, ByteOrder::LeastSignificantByteFirst));
+    auto project = projectWithPdu(pdu, {makeSignal("A", 8), makeSignal("B", 8)});
+    EXPECT_TRUE(Validator{}.validateCanSemantics(project).errors.empty());
+}
+
+TEST(CanOverlapTest, OverlappingIntelSignalsFailOnce) {
+    Pdu pdu = makePdu("P", 8);
+    pdu.signalMappings.push_back(
+        makeMapping("A", 0, ByteOrder::LeastSignificantByteFirst));
+    pdu.signalMappings.push_back(
+        makeMapping("B", 4, ByteOrder::LeastSignificantByteFirst));
+    auto project = projectWithPdu(pdu, {makeSignal("A", 8), makeSignal("B", 8)});
+    const ValidationResult result = Validator{}.validateCanSemantics(project);
+    ASSERT_EQ(result.errors.size(), 1U);
+    EXPECT_EQ(result.errors.front().code, "can.signal_overlap");
+}
+
+TEST(CanOverlapTest, NonOverlappingMotorolaPairPassesRegression) {
+    // cantools #412 shape: the same non-overlapping pair expressed in
+    // Motorola notation must not false-positive. A=byte0 (MSB 7, len 8),
+    // B=byte1 (MSB 15, len 8) are disjoint in physical space.
+    Pdu pdu = makePdu("P", 8);
+    pdu.signalMappings.push_back(
+        makeMapping("A", 7, ByteOrder::MostSignificantByteFirst));
+    pdu.signalMappings.push_back(
+        makeMapping("B", 15, ByteOrder::MostSignificantByteFirst));
+    auto project = projectWithPdu(pdu, {makeSignal("A", 8), makeSignal("B", 8)});
+    EXPECT_TRUE(Validator{}.validateCanSemantics(project).errors.empty());
+}
+
+TEST(CanOverlapTest, OverlappingMotorolaSignalsFail) {
+    Pdu pdu = makePdu("P", 8);
+    pdu.signalMappings.push_back(
+        makeMapping("A", 7, ByteOrder::MostSignificantByteFirst));
+    pdu.signalMappings.push_back(
+        makeMapping("B", 3, ByteOrder::MostSignificantByteFirst));
+    auto project = projectWithPdu(pdu, {makeSignal("A", 8), makeSignal("B", 8)});
+    const ValidationResult result = Validator{}.validateCanSemantics(project);
+    ASSERT_EQ(result.errors.size(), 1U);
+    EXPECT_EQ(result.errors.front().code, "can.signal_overlap");
+}

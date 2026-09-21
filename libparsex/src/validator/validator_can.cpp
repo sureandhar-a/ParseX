@@ -1,6 +1,11 @@
 #include <parsex/validator/validator.hpp>
 
+#include <parsex/model/signal.hpp>
+
 #include <array>
+#include <map>
+#include <optional>
+#include <string>
 #include <vector>
 
 // CAN FD DLC table: non-linear above DLC 8. Fixed lookup, never a formula.
@@ -104,12 +109,74 @@ void checkPayloadLength(const std::string& kind, const std::string& name,
     out.errors.push_back(std::move(finding));
 }
 
+// Bit-occupancy overlap check for one PDU (cantools "claim array, collision =
+// overlap", adapted to C++). Signals run in declaration order so messages are
+// deterministic. Mapping start/byte-order come from the PDU's own mappings;
+// bit length resolves via the file's Signal table by short name (a mapping
+// with no matching Signal is skipped — dangling refs are PBI 2's job).
+void checkSignalOverlap(const Pdu& pdu, const std::map<std::string, const Signal*>& signals,
+                        ValidationResult& out) {
+    const std::size_t pduBits = static_cast<std::size_t>(pdu.length) * 8;
+    if (pduBits == 0 || pdu.signalMappings.empty()) {
+        return;
+    }
+    std::vector<std::optional<std::string>> occupancy(pduBits, std::nullopt);
+    for (const auto& mapping : pdu.signalMappings) {
+        const auto sigIt = signals.find(mapping.signalShortNameRef);
+        if (sigIt == signals.end()) {
+            continue;
+        }
+        const std::uint32_t bitLength = sigIt->second->bitLength;
+        if (bitLength == 0) {
+            continue;
+        }
+        const std::vector<int> bits = Validator::physicalBitsForSignal(
+            mapping.byteOrder, static_cast<int>(mapping.startPosition),
+            static_cast<int>(bitLength));
+        for (int bit : bits) {
+            if (bit < 0 || static_cast<std::size_t>(bit) >= pduBits) {
+                ValidationError finding;
+                finding.severity = Severity::Error;
+                finding.code = "can.signal_out_of_range";
+                finding.message = "signal '" + mapping.signalShortNameRef + "' bit " +
+                                  std::to_string(bit) + " exceeds PDU '" +
+                                  pdu.common.shortName + "' payload (" +
+                                  std::to_string(pdu.length) + " bytes)";
+                finding.location = pdu.common.rawSpanRef;
+                finding.path = mapping.signalShortNameRef;
+                out.errors.push_back(std::move(finding));
+                break;
+            }
+            std::optional<std::string>& owner =
+                occupancy[static_cast<std::size_t>(bit)];
+            if (owner.has_value() && owner.value() != mapping.signalShortNameRef) {
+                ValidationError finding;
+                finding.severity = Severity::Error;
+                finding.code = "can.signal_overlap";
+                finding.message = "signals '" + owner.value() + "' and '" +
+                                  mapping.signalShortNameRef + "' overlap in PDU '" +
+                                  pdu.common.shortName + "' at bit " + std::to_string(bit);
+                finding.location = pdu.common.rawSpanRef;
+                finding.path = pdu.common.shortName;
+                finding.actualType = mapping.signalShortNameRef;
+                out.errors.push_back(std::move(finding));
+                break;  // one report per colliding signal, like cantools' raise
+            }
+            owner = mapping.signalShortNameRef;
+        }
+    }
+}
+
 }  // namespace
 
-// PAR-108: DLC part only; signal-overlap joins in PAR-110.
+// PAR-108 DLC + PAR-110 overlap combined.
 ValidationResult Validator::validateCanSemantics(const ParsedProject& project) const {
     ValidationResult result;
     for (const auto& file : project.files) {
+        std::map<std::string, const Signal*> signals;
+        for (const auto& signal : file.signals) {
+            signals.try_emplace(signal.common.shortName, &signal);
+        }
         for (const auto& frame : file.frames) {
             checkPayloadLength("Frame", frame.common.shortName, frame.length,
                                frame.common.rawSpanRef, result);
@@ -117,6 +184,7 @@ ValidationResult Validator::validateCanSemantics(const ParsedProject& project) c
         for (const auto& pdu : file.pdus) {
             checkPayloadLength("Pdu", pdu.common.shortName, pdu.length,
                                pdu.common.rawSpanRef, result);
+            checkSignalOverlap(pdu, signals, result);
         }
     }
     return result;
