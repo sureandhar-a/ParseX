@@ -41,6 +41,9 @@ public:
     // DEST mismatches become errors (implemented PAR-103/PAR-104).
     ValidationResult validateReferences(const ParsedProject& project) const;
 
+    // PBI 3: SHORT-NAME unique among direct siblings per parent (PAR-106).
+    ValidationResult validateUniqueness(const ParsedProject& project) const;
+
 private:
     static void onSchemaError(void* userData, const xmlError* error);
 };

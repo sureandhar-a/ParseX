@@ -2,6 +2,7 @@ add_executable(validator_tests
     validation_result_test.cpp
     validate_schema_test.cpp
     validate_references_test.cpp
+    validate_uniqueness_test.cpp
 )
 target_link_libraries(
     validator_tests
