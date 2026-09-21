@@ -5,6 +5,7 @@ add_executable(validator_tests
     validate_uniqueness_test.cpp
     validate_can_test.cpp
     validate_facade_test.cpp
+    validate_all_test.cpp
 )
 target_link_libraries(
     validator_tests
