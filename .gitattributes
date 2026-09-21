@@ -1,0 +1,6 @@
+# Byte-exact test fixtures must check out with LF endings on every platform.
+# Windows runners default to CRLF conversion, which inserts a byte per line
+# and shifts every RawSpan offset — breaking the Loader's byte-slice span
+# assertions (which is precisely what they exist to verify). See the Windows
+# CI failure fixed alongside this file: startOffset 40 vs 39, size 348 vs 347.
+*.arxml text eol=lf
