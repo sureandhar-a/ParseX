@@ -1,0 +1,18 @@
+Provenance for system-4.2.arxml (kept byte-identical to the original —
+do not edit this fixture; real-world fidelity is the point).
+
+Source: https://github.com/cantools/cantools/blob/master/tests/files/arxml/system-4.2.arxml
+Fetched: 2026-09-20 (raw.githubusercontent.com)
+Upstream license: MIT, Copyright (c) 2015-2019 Erik Moqvist
+  (https://github.com/cantools/cantools/blob/master/LICENSE)
+  MIT attribution is satisfied by this sidecar: keep it alongside any copy.
+
+Content: AUTOSAR 4.2 system description (schema location AUTOSAR_00046.xsd),
+UTF-8 with BOM, 71059 bytes, 1477 lines, 918 elements / 165 distinct tags —
+CAN-CLUSTER x1, CAN-FRAME x8, I-SIGNAL-I-PDU x7, I-SIGNAL x19,
+SYSTEM-SIGNAL x13, ECU-INSTANCE x3. Well-formed per xmllint.
+
+SHA-256: c6bf5671279bc7ec4f81ebbe48f430d5a7049abd04fbf279c8080a193c973fb2
+
+Verified 2026-09-20: ParseX loadRawDocument() loads all 918 elements with
+exact spans (independent regex inventory matches the loaded tree 918/918).

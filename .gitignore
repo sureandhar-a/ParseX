@@ -84,3 +84,14 @@ resources/schemas/*.xsd
 
 #Python cache
 */__pycache__
+
+#spike folder
+spikes/*
+
+# libFuzzer runtime artifacts (crashers/hangs/leaks land in the fuzzer's CWD).
+# The seed corpus (fuzz/corpus/) IS committed; everything a fuzz run
+# generates is not.
+crash-*
+oom-*
+timeout-*
+leak-*
