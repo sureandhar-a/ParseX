@@ -15,6 +15,8 @@
 // Thread-safety: the shared xmlSchema* may be read concurrently, but each
 // validateSchema() call mints its own xmlSchemaValidCtxt* — never shared
 // across calls or threads (libxml2 maintainer requirement).
+enum class StrictMode { Lenient, Strict };
+
 class Validator {
 public:
     Validator() = default;
@@ -64,6 +66,14 @@ public:
     static std::vector<int> physicalBitsForSignal(ByteOrder byteOrder, int startBit,
                                                   int bitLength);
     ValidationResult validateCanSemantics(const ParsedProject& project) const;
+
+    // PBI 5: combined entry point + strict-mode verdict (PAR-112).
+    // Order: schema first (a schema-broken file makes semantic findings less
+    // meaningful), but all four always run — no short-circuit, so one pass
+    // reports every problem category. Strict mode only flips the overall
+    // pass/fail verdict; individual severities are never rewritten.
+    ValidationResult validateAll(const ParsedProject& project, ::xmlSchema* sharedSchema) const;
+    static bool overallPassed(const ValidationResult& result, StrictMode mode);
 
 private:
     static void onSchemaError(void* userData, const xmlError* error);
