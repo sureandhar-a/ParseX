@@ -9,6 +9,7 @@ add_library(libparsex STATIC
     src/release_detector.cpp
     src/model_builder.cpp
     src/parser.cpp
+    src/validator/validation_result.cpp
 )
 
 # Tell targets linking against libparsex where to find its header files
