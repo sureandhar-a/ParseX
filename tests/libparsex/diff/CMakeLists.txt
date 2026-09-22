@@ -7,6 +7,7 @@ add_executable(diff_tests
     diff_fields_test.cpp
     diff_nested_test.cpp
     diff_populate_test.cpp
+    field_diffing_test.cpp
 )
 target_link_libraries(
     diff_tests
