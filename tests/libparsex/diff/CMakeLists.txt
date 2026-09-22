@@ -11,6 +11,7 @@ add_executable(diff_tests
     diff_sort_test.cpp
     diff_text_test.cpp
     diff_json_test.cpp
+    diff_golden_test.cpp
 )
 target_link_libraries(
     diff_tests
@@ -18,5 +19,10 @@ target_link_libraries(
     libparsex
     GTest::gtest
     GTest::gtest_main
+)
+target_compile_definitions(
+    diff_tests
+    PRIVATE
+    DIFF_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden"
 )
 gtest_discover_tests(diff_tests)

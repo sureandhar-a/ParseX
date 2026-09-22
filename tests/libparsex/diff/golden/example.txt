@@ -1,0 +1,19 @@
+Added:
+  Frame /AMB3
+  Frame /AMB4
+  Frame /FNew
+
+Removed:
+  Frame /AMB1
+  Frame /AMB2
+  Frame /FOld
+
+Moved:
+  Frame /FMoveOld -> /FMoveNew
+
+Modified:
+  Signal /SMod
+    startBit: 3 -> 7
+
+Diagnostics:
+  [Frame] 4 candidates shared secondary key len:16|tx:|pdu: for type Frame, no move inferred (removed:/AMB1, removed:/AMB2, added:/AMB3, added:/AMB4)

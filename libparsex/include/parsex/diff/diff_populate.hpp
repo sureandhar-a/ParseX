@@ -7,10 +7,10 @@
 //
 // Replaces PAR-116's placeholder Modified entries (matched paths, empty
 // fieldDiffs) with real field-level data from diffStruct()/nested helpers.
-// A matched element with zero real differences is dropped entirely — the
+// A Modified entry with zero real differences is dropped entirely — the
 // placeholder was only internal bookkeeping. Moved entries are also field
-// diffed (a moved element can carry field changes on the same entry; the
-// facade in PAR-135 relies on this). Added/Removed entries pass through
-// untouched.
+// diffed but always kept (a plain move with empty fieldDiffs is still a real
+// finding; the facade in PAR-135 relies on this). Added/Removed entries pass
+// through untouched.
 [[nodiscard]] DiffReport populateFieldDiffs(const ParsedProject& oldProject,
                                             const ParsedProject& newProject, DiffReport report);

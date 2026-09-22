@@ -106,7 +106,6 @@ DiffReport populateFieldDiffs(const ParsedProject& oldProject, const ParsedProje
     const auto newSignalIdx = indexByPath(newSignals);
     const auto oldGroupIdx = indexByPath(oldGroups);
     const auto newGroupIdx = indexByPath(newGroups);
-
     std::vector<DiffEntry> kept;
     kept.reserve(report.entries.size());
     for (auto& entry : report.entries) {
@@ -115,9 +114,13 @@ DiffReport populateFieldDiffs(const ParsedProject& oldProject, const ParsedProje
             continue;
         }
         entry.fieldDiffs =
-            diffPair(entry.elementType, entry.oldPath, entry.newPath, oldClusterIdx, newClusterIdx, oldEcuIdx, newEcuIdx, oldFrameIdx, newFrameIdx,
-                     oldPduIdx, newPduIdx, oldSignalIdx, newSignalIdx, oldGroupIdx, newGroupIdx);
-        if (!entry.fieldDiffs.empty()) {
+            diffPair(entry.elementType, entry.oldPath, entry.newPath, oldClusterIdx,
+                     newClusterIdx, oldEcuIdx, newEcuIdx, oldFrameIdx, newFrameIdx, oldPduIdx,
+                     newPduIdx, oldSignalIdx, newSignalIdx, oldGroupIdx, newGroupIdx);
+        // A Modified entry with zero real differences was only a placeholder —
+        // drop it. A Moved entry is a real finding (the path change itself) and
+        // is always kept, even with empty fieldDiffs (plain move, PAR-135).
+        if (entry.kind == DiffKind::Moved || !entry.fieldDiffs.empty()) {
             kept.push_back(std::move(entry));
         }
     }

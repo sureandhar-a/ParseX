@@ -61,9 +61,13 @@ template <typename T>
 [[nodiscard]] inline std::string diffValueToString(const RawSpan& /*span*/) { return "span"; }
 
 [[nodiscard]] inline std::string diffValueToString(const CommonFields& c) {
-    std::string out = "shortName=" + c.shortName + "|category=";
-    out += c.category.has_value() ? *c.category : "nullopt";
-    return out;
+    // Identity-excluded: shortName is the element's identity (matched by path
+    // in PAR-122, correlated by secondary key in PAR-124), not a field
+    // change. A Moved entry's old/new shortNames differ by definition — that
+    // is the move itself, reported via oldPath/newPath, and must not also
+    // appear as a spurious "common" FieldDiff (PAR-135 needs plain moves to
+    // carry empty fieldDiffs).
+    return std::string("category=") + (c.category.has_value() ? *c.category : "nullopt");
 }
 
 [[nodiscard]] inline std::string diffValueToString(const FramePduMapping& m) {
