@@ -1,0 +1,11 @@
+add_executable(diff_tests
+    diff_report_test.cpp
+)
+target_link_libraries(
+    diff_tests
+    PRIVATE
+    libparsex
+    GTest::gtest
+    GTest::gtest_main
+)
+gtest_discover_tests(diff_tests)
