@@ -15,8 +15,9 @@ if(MINGW)
     # the matching libstdc++/libgcc/libwinpthread DLLs on PATH at run time.
     add_link_options(-static-libgcc -static-libstdc++ -static)
 endif()
+option(PARSEX_ENABLE_CLANG_TIDY "Run clang-tidy on every compile (slow; CI covers this with a dedicated job)" OFF)
 find_program(CLANG_TIDY_EXE NAMES clang-tidy PATHS "$ENV{HOMEBREW_PREFIX}/opt/llvm/bin")
-if(CLANG_TIDY_EXE)
+if(PARSEX_ENABLE_CLANG_TIDY AND CLANG_TIDY_EXE)
     set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")
 endif()
 

@@ -1,0 +1,22 @@
+add_executable(validator_tests
+    validation_result_test.cpp
+    validate_schema_test.cpp
+    validate_references_test.cpp
+    validate_uniqueness_test.cpp
+    validate_can_test.cpp
+    validate_facade_test.cpp
+    validate_all_test.cpp
+)
+target_link_libraries(
+    validator_tests
+    PRIVATE
+    libparsex
+    GTest::gtest
+    GTest::gtest_main
+)
+target_compile_definitions(
+    validator_tests
+    PRIVATE
+    PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+)
+gtest_discover_tests(validator_tests)
