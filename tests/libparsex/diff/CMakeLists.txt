@@ -6,6 +6,7 @@ add_executable(diff_tests
     move_detection_test.cpp
     diff_fields_test.cpp
     diff_nested_test.cpp
+    diff_populate_test.cpp
 )
 target_link_libraries(
     diff_tests
