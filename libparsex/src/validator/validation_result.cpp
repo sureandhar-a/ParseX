@@ -1,21 +1,16 @@
 #include <parsex/validator/validation_result.hpp>
 
+#include <algorithm>
+
 bool ValidationResult::hasErrors() const noexcept {
-    for (const auto& err : errors) {
-        if (err.severity == Severity::Error) {
-            return true;
-        }
-    }
-    return false;
+    return std::ranges::any_of(
+        errors, [](const ValidationError& err) { return err.severity == Severity::Error; });
 }
 
 bool ValidationResult::hasWarnings() const noexcept {
-    for (const auto& err : errors) {
-        if (err.severity == Severity::Warning) {
-            return true;
-        }
-    }
-    return false;
+    return std::ranges::any_of(errors, [](const ValidationError& err) {
+        return err.severity == Severity::Warning;
+    });
 }
 
 void ValidationResult::merge(const ValidationResult& other) {

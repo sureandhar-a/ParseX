@@ -6,17 +6,16 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 // CAN FD DLC table: non-linear above DLC 8. Fixed lookup, never a formula.
 std::optional<std::uint32_t> Validator::canFdBytesForDlc(int dlc) {
-    static constexpr std::array<std::uint32_t, 16> kTable = {
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64,
-    };
+    static constexpr std::array<std::uint32_t, 16> kTable = {0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64};
     if (dlc < 0 || dlc > 15) {
         return std::nullopt;
     }
-    return kTable[static_cast<std::size_t>(dlc)];
+    return kTable.at(static_cast<std::size_t>(dlc));
 }
 
 bool Validator::isValidClassicCanLength(std::uint32_t length) {
@@ -134,7 +133,7 @@ void checkSignalOverlap(const Pdu& pdu, const std::map<std::string, const Signal
             mapping.byteOrder, static_cast<int>(mapping.startPosition),
             static_cast<int>(bitLength));
         for (int bit : bits) {
-            if (bit < 0 || static_cast<std::size_t>(bit) >= pduBits) {
+            if (bit < 0 || std::cmp_greater_equal(bit, pduBits)) {
                 ValidationError finding;
                 finding.severity = Severity::Error;
                 finding.code = "can.signal_out_of_range";
@@ -148,7 +147,7 @@ void checkSignalOverlap(const Pdu& pdu, const std::map<std::string, const Signal
                 break;
             }
             std::optional<std::string>& owner =
-                occupancy[static_cast<std::size_t>(bit)];
+                occupancy.at(static_cast<std::size_t>(bit));
             if (owner.has_value() && owner.value() != mapping.signalShortNameRef) {
                 ValidationError finding;
                 finding.severity = Severity::Error;
@@ -170,6 +169,7 @@ void checkSignalOverlap(const Pdu& pdu, const std::map<std::string, const Signal
 }  // namespace
 
 // PAR-108 DLC + PAR-110 overlap combined.
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): stateless-by-design instance API — callers write Validator{}.validateCanSemantics(...).
 ValidationResult Validator::validateCanSemantics(const ParsedProject& project) const {
     ValidationResult result;
     for (const auto& file : project.files) {

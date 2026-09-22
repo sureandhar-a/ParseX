@@ -55,10 +55,14 @@ void checkNode(const RawNode& node, const std::string& basePath,
             ValidationError finding;
             finding.severity = Severity::Error;
             finding.code = "shortname.duplicate";
-            finding.message = "duplicate SHORT-NAME '" + name + "' under '" +
-                              (nodePath.empty() ? "/" : nodePath) + "'";
+            std::string message = "duplicate SHORT-NAME '";
+            message += name;
+            message += "' under '";
+            message += (nodePath.empty() ? "/" : nodePath);
+            message += '\'';
+            finding.message = std::move(message);
             // Point at the second occurrence; message names the first via path.
-            finding.location = members[1]->span;
+            finding.location = members.at(1)->span;
             finding.path = nodePath.empty() ? "/" : nodePath;
             out.errors.push_back(std::move(finding));
         }
@@ -74,6 +78,7 @@ void checkNode(const RawNode& node, const std::string& basePath,
 
 }  // namespace
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): stateless-by-design instance API — callers write Validator{}.validateUniqueness(...).
 ValidationResult Validator::validateUniqueness(const ParsedProject& project) const {
     ValidationResult result;
     for (const auto& file : project.files) {

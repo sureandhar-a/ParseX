@@ -49,7 +49,7 @@ void indexNode(const RawNode& node, const std::string& basePath,
 bool isRefTag(const std::string& tag) {
     // AUTOSAR references are XXX-REF (TRANSMITTER-REF, PDU-REF, ...).
     // Bare "REF" alone is not a reference element.
-    return tag.size() > 4 && tag.compare(tag.size() - 4, 4, "-REF") == 0;
+    return tag.size() > 4 && tag.ends_with("-REF");
 }
 
 std::optional<std::string> destAttr(const RawNode& node) {
@@ -61,9 +61,16 @@ std::optional<std::string> destAttr(const RawNode& node) {
     return std::nullopt;
 }
 
-void collectRefs(const RawNode& node, std::vector<const RawNode*>& out) {
-    if (isRefTag(node.tagName) && destAttr(node).has_value()) {
-        out.push_back(&node);
+struct RefSite {
+    const RawNode* node = nullptr;
+    std::string dest;
+};
+
+void collectRefs(const RawNode& node, std::vector<RefSite>& out) {
+    if (isRefTag(node.tagName)) {
+        if (const std::optional<std::string> dest = destAttr(node); dest.has_value()) {
+            out.push_back({.node = &node, .dest = *dest});
+        }
     }
     for (const auto& child : node.children) {
         collectRefs(*child, out);
@@ -88,17 +95,19 @@ const std::map<std::string, std::vector<std::string>>& destToTags() {
     return kTable;
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): call sites pass (resolved tag, declared DEST) in documented order; the names differ by role.
 bool tagMatchesDest(const std::string& actualTag, const std::string& dest) {
     const auto& table = destToTags();
-    const auto it = table.find(dest);
-    if (it == table.end()) {
+    const auto found = table.find(dest);
+    if (found == table.end()) {
         return true;  // unrecognized DEST handled as warning by caller
     }
-    return std::ranges::find(it->second, actualTag) != it->second.end();
+    return std::ranges::find(found->second, actualTag) != found->second.end();
 }
 
 }  // namespace
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): stateless-by-design instance API — callers write Validator{}.buildReferencePathIndex(...).
 std::map<std::string, const RawNode*> Validator::buildReferencePathIndex(
     const ParsedProject& project) const {
     std::map<std::string, const RawNode*> index;
@@ -120,9 +129,11 @@ ValidationResult Validator::validateReferences(const ParsedProject& project) con
         if (file.rawDocument == nullptr) {
             continue;
         }
-        std::vector<const RawNode*> refs;
+        std::vector<RefSite> refs;
         collectRefs(file.rawDocument->root, refs);
-        for (const RawNode* ref : refs) {
+        for (const RefSite& site : refs) {
+            const RawNode* ref = site.node;
+            const std::string& dest = site.dest;
             const std::string path = trimText(ref->text);
             if (path.empty()) {
                 continue;  // malformed ref with no target: not file-resolvable
@@ -132,22 +143,29 @@ ValidationResult Validator::validateReferences(const ParsedProject& project) con
                 ValidationError finding;
                 finding.severity = Severity::Error;
                 finding.code = "ref.dangling";
-                finding.message = "dangling reference to '" + path + "'";
+                std::string message = "dangling reference to '";
+                message += path;
+                message += '\'';
+                finding.message = std::move(message);
                 finding.location = ref->span;
                 finding.path = path;
                 result.errors.push_back(std::move(finding));
                 continue;
             }
             // Step two: DEST type compare.
-            const std::string dest = destAttr(*ref).value();
             const auto& table = destToTags();
-            if (table.find(dest) == table.end()) {
+            if (!table.contains(dest)) {
                 // CAN-subset table only: unrecognized DEST on non-CAN refs
                 // must not block validation of what ParseX understands.
                 ValidationError finding;
                 finding.severity = Severity::Warning;
                 finding.code = "ref.dest_unrecognized";
-                finding.message = "unrecognized DEST '" + dest + "' for '" + path + "'";
+                std::string message = "unrecognized DEST '";
+                message += dest;
+                message += "' for '";
+                message += path;
+                message += '\'';
+                finding.message = std::move(message);
                 finding.location = ref->span;
                 finding.path = path;
                 finding.expectedType = dest;
@@ -159,8 +177,14 @@ ValidationResult Validator::validateReferences(const ParsedProject& project) con
                 ValidationError finding;
                 finding.severity = Severity::Error;
                 finding.code = "ref.type_mismatch";
-                finding.message = "reference to '" + path + "' expects DEST '" + dest +
-                                  "' but resolves to <" + actualTag + ">";
+                std::string message = "reference to '";
+                message += path;
+                message += "' expects DEST '";
+                message += dest;
+                message += "' but resolves to <";
+                message += actualTag;
+                message += '>';
+                finding.message = std::move(message);
                 finding.location = ref->span;
                 finding.path = path;
                 finding.expectedType = dest;

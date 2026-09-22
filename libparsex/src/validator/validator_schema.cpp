@@ -44,11 +44,11 @@ void collectLineEntries(const RawNode& node, LineIndex& out) {
 LineIndex buildLineIndex(const RawNode& root) {
     LineIndex index;
     collectLineEntries(root, index);
-    std::ranges::sort(index, [](const auto& a, const auto& b) {
-        if (a.first != b.first) {
-            return a.first < b.first;
+    std::ranges::sort(index, [](const auto& lhs, const auto& rhs) {
+        if (lhs.first != rhs.first) {
+            return lhs.first < rhs.first;
         }
-        return a.second.startOffset < b.second.startOffset;
+        return lhs.second.startOffset < rhs.second.startOffset;
     });
     return index;
 }
@@ -57,19 +57,19 @@ std::optional<RawSpan> spanForLine(const LineIndex& index, int line) {
     if (index.empty() || line <= 0) {
         return std::nullopt;
     }
-    const auto it =
+    const auto match =
         std::ranges::lower_bound(index, line, {}, &std::pair<int, RawSpan>::first);
-    if (it == index.end()) {
+    if (match == index.end()) {
         return index.back().second;
     }
-    if (it->first == line) {
-        return it->second;
+    if (match->first == line) {
+        return match->second;
     }
-    if (it == index.begin()) {
-        return it->second;
+    if (match == index.begin()) {
+        return match->second;
     }
-    const auto& higher = *it;
-    const auto& lower = *(it - 1);
+    const auto& higher = *match;
+    const auto& lower = *(match - 1);
     const int loDist = line - lower.first;
     const int hiDist = higher.first - line;
     // Tie -> predecessor (the element whose start encloses the error line).
@@ -100,19 +100,20 @@ void Validator::onSchemaError(void* userData, const xmlError* error) {
     ctx->result->errors.push_back(std::move(finding));
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): stateless-by-design instance API — callers write Validator{}.validateSchema(...).
 ValidationResult Validator::validateSchema(const ParsedFile& file,
-                                           ::xmlSchema* sharedSchema) const {
+                                            ::xmlSchema* sharedSchema) const {
     ValidationResult result;
     if (sharedSchema == nullptr) {
         result.errors.push_back({.severity = Severity::Error,
                                  .code = "schema.no_schema",
-                                 .message = "validateSchema: null shared schema handle"});
+                                 .message = "validateSchema: null shared schema handle",});
         return result;
     }
     if (file.sourcePath.empty()) {
         result.errors.push_back({.severity = Severity::Error,
                                  .code = "schema.no_source",
-                                 .message = "validateSchema: ParsedFile has no sourcePath"});
+                                 .message = "validateSchema: ParsedFile has no sourcePath",});
         return result;
     }
 
@@ -121,7 +122,7 @@ ValidationResult Validator::validateSchema(const ParsedFile& file,
     if (vctxt == nullptr) {
         result.errors.push_back({.severity = Severity::Error,
                                  .code = "schema.no_context",
-                                 .message = "validateSchema: cannot create validation context"});
+                                 .message = "validateSchema: cannot create validation context",});
         return result;
     }
     // Structured (not printf-style) errors: callback gets xmlErrorPtr directly.
@@ -139,7 +140,7 @@ ValidationResult Validator::validateSchema(const ParsedFile& file,
         result.errors.push_back({.severity = Severity::Error,
                                  .code = "schema.unreadable",
                                  .message = "validateSchema: cannot re-parse '" + narrowPath +
-                                            "' for validation"});
+                                            "' for validation",});
         return result;
     }
 
@@ -148,7 +149,7 @@ ValidationResult Validator::validateSchema(const ParsedFile& file,
         // Internal error: no structured error was necessarily reported.
         result.errors.push_back({.severity = Severity::Error,
                                  .code = "schema.internal",
-                                 .message = "validateSchema: internal validation error"});
+                                 .message = "validateSchema: internal validation error",});
     }
     // ret == 0 -> valid (no findings); ret > 0 -> findings already captured.
     return result;
