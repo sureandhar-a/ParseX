@@ -10,6 +10,7 @@ add_executable(diff_tests
     field_diffing_test.cpp
     diff_sort_test.cpp
     diff_text_test.cpp
+    diff_json_test.cpp
 )
 target_link_libraries(
     diff_tests

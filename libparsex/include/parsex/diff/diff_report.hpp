@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 // Plain data types the rest of the Diff Engine builds on (PAR-121).
 //
 // Matching (PAR-122), move detection (PAR-124), field diffing (PAR-127) and
@@ -62,6 +64,13 @@ struct DiffReport {
 
     // Human-readable text rendering (PAR-132), grouped by category.
     [[nodiscard]] std::string toText() const;
+
+    // Structured JSON rendering (PAR-133): faithful, parseable representation
+    // of DiffReport. Deliberately simple/flat — the future JSON Output
+    // Contract Feature formalizes a project-wide schema later.
+    [[nodiscard]] nlohmann::json toJson() const;
+    // Round-trip support for tests (not long-term public API).
+    [[nodiscard]] static DiffReport fromJson(const nlohmann::json& j);
 };
 
 [[nodiscard]] std::string toString(DiffKind kind);
