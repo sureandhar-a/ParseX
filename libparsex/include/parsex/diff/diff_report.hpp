@@ -28,10 +28,20 @@ struct DiffEntry {
     std::vector<FieldDiff> fieldDiffs;
 };
 
+// Ambiguity diagnostic (PAR-125): a secondary-key group that did not pair
+// cleanly 1:1, so no Moved was inferred. The message names the shared key
+// and lists candidate paths so a human can manually check.
+struct DiffDiagnostic {
+    std::string message;
+    std::string elementType;
+};
+
 struct DiffReport {
     std::vector<DiffEntry> entries;
+    std::vector<DiffDiagnostic> diagnostics;
 
-    [[nodiscard]] bool empty() const noexcept { return entries.empty(); }
+    [[nodiscard]] bool empty() const noexcept { return entries.empty() && diagnostics.empty(); }
+    [[nodiscard]] bool hasEntries() const noexcept { return !entries.empty(); }
 
     // Each domain-type matching pass builds its own small DiffReport; merge()
     // combines them into one. Appends other's entries, preserving relative

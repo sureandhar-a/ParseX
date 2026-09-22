@@ -8,10 +8,14 @@ void DiffReport::merge(DiffReport&& other) {
     entries.insert(entries.end(), std::make_move_iterator(other.entries.begin()),
                    std::make_move_iterator(other.entries.end()));
     other.entries.clear();
+    diagnostics.insert(diagnostics.end(), std::make_move_iterator(other.diagnostics.begin()),
+                       std::make_move_iterator(other.diagnostics.end()));
+    other.diagnostics.clear();
 }
 
 void DiffReport::merge(const DiffReport& other) {
     entries.insert(entries.end(), other.entries.begin(), other.entries.end());
+    diagnostics.insert(diagnostics.end(), other.diagnostics.begin(), other.diagnostics.end());
 }
 
 std::string toString(DiffKind kind) {
@@ -51,9 +55,13 @@ std::ostream& operator<<(std::ostream& os, const DiffEntry& entry) {
 }
 
 std::ostream& operator<<(std::ostream& os, const DiffReport& report) {
-    os << "DiffReport(" << report.entries.size() << " entries)";
+    os << "DiffReport(" << report.entries.size() << " entries, " << report.diagnostics.size()
+       << " diagnostics)";
     for (const auto& entry : report.entries) {
         os << "\n  " << entry;
+    }
+    for (const auto& diag : report.diagnostics) {
+        os << "\n  [Diagnostic] " << diag.elementType << ": " << diag.message;
     }
     return os;
 }

@@ -40,8 +40,10 @@
 // Only touches entries with elementType == elementTypeName. Groups Removed
 // and Added entries by secondary key (looked up via oldIndex/newIndex); a
 // group with exactly one Removed and one Added becomes a single Moved entry.
-// Ambiguous groups (anything else) are left untouched here — PAR-125 adds
-// diagnostics for those.
+// Ambiguous groups (both sides present but not a clean 1:1 pairing) are left
+// as Removed/Added and gain a DiffDiagnostic (PAR-125) — never silently
+// guessed. Groups with only one side present are simply unmatched, no
+// diagnostic.
 template <typename T>
 void detectMovesForType(const std::map<std::string, const T*>& oldIndex,
                         const std::map<std::string, const T*>& newIndex, DiffReport& report,
@@ -77,13 +79,34 @@ void detectMovesForType(const std::map<std::string, const T*>& oldIndex,
 
     std::vector<std::size_t> addedToErase;
     for (auto& [key, group] : groups) {
-        (void)key;
         if (group.removedIdx.size() == 1 && group.addedIdx.size() == 1) {
             DiffEntry& removed = report.entries[group.removedIdx[0]];
             const DiffEntry& added = report.entries[group.addedIdx[0]];
             removed.kind = DiffKind::Moved;
             removed.newPath = added.newPath;
             addedToErase.push_back(group.addedIdx[0]);
+        } else if (!group.removedIdx.empty() && !group.addedIdx.empty()) {
+            const std::size_t total = group.removedIdx.size() + group.addedIdx.size();
+            std::string message = std::to_string(total) + " candidates shared secondary key " +
+                                  key + " for type " + elementTypeName + ", no move inferred (";
+            bool first = true;
+            for (const std::size_t idx : group.removedIdx) {
+                if (!first) {
+                    message += ", ";
+                }
+                first = false;
+                message += "removed:" + report.entries[idx].oldPath;
+            }
+            for (const std::size_t idx : group.addedIdx) {
+                if (!first) {
+                    message += ", ";
+                }
+                first = false;
+                message += "added:" + report.entries[idx].newPath;
+            }
+            message += ")";
+            report.diagnostics.push_back({.message = std::move(message),
+                                           .elementType = elementTypeName});
         }
     }
     if (!addedToErase.empty()) {
