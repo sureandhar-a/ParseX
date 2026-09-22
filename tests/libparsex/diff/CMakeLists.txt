@@ -13,6 +13,7 @@ add_executable(diff_tests
     diff_json_test.cpp
     diff_golden_test.cpp
     diff_engine_test.cpp
+    diff_e2e_test.cpp
 )
 target_link_libraries(
     diff_tests
