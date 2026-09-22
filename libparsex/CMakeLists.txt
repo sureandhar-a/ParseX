@@ -13,6 +13,7 @@ add_library(libparsex STATIC
     src/diff/diff_match.cpp
     src/diff/diff_moves.cpp
     src/diff/diff_populate.cpp
+    src/diff/diff_render.cpp
     src/validator/validation_result.cpp
     src/validator/validator_schema.cpp
     src/validator/validator_references.cpp

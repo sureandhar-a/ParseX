@@ -59,6 +59,9 @@ struct DiffReport {
     // Deterministic ordering pass (PAR-131): sort entries by stable path key
     // so output never depends on hash-map iteration order.
     void sortDeterministically();
+
+    // Human-readable text rendering (PAR-132), grouped by category.
+    [[nodiscard]] std::string toText() const;
 };
 
 [[nodiscard]] std::string toString(DiffKind kind);
