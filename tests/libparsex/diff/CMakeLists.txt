@@ -3,6 +3,7 @@ add_executable(diff_tests
     diff_match_test.cpp
     path_matching_test.cpp
     diff_moves_test.cpp
+    move_detection_test.cpp
 )
 target_link_libraries(
     diff_tests
