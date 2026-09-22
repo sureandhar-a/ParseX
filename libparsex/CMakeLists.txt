@@ -10,6 +10,7 @@ add_library(libparsex STATIC
     src/model_builder.cpp
     src/parser.cpp
     src/diff/diff_report.cpp
+    src/diff/diff_match.cpp
     src/validator/validation_result.cpp
     src/validator/validator_schema.cpp
     src/validator/validator_references.cpp
