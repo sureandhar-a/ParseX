@@ -7,6 +7,9 @@ jobs:
   build:
     env:
         VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+        # Cache compiled vcpkg ports in the Actions cache so dependency builds
+        # become downloads on a hit instead of from-source compiles.
+        VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
     strategy:
         fail-fast: false
         matrix:
@@ -43,7 +46,7 @@ jobs:
           if: runner.os == 'Windows'
           run: cmake --preset default -DVCPKG_TARGET_TRIPLET=x64-mingw-static
         - name: Build
-          run: cmake --build build/debug
+          run: cmake --build build/debug --parallel
         - name: Test
           run: ctest --test-dir build/debug --output-on-failure
 
@@ -53,7 +56,7 @@ jobs:
 
         - name: Build with sanitizers
           if: runner.os != 'Windows'
-          run: cmake --build build/asan
+          run: cmake --build build/asan --parallel
 
         - name: Test (Linux — full ASan+UBSan+LSan)
           if: runner.os == 'Linux'
@@ -69,6 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
     steps:
       - uses: actions/checkout@v5
         with:
