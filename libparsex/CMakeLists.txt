@@ -40,6 +40,8 @@ target_compile_definitions(libparsex PRIVATE
 
 find_package(LibXml2 REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(boost_pfr CONFIG REQUIRED)
 
 # Link dependencies to the library target so they propagate to consumers
-target_link_libraries(libparsex PUBLIC LibXml2::LibXml2 nlohmann_json::nlohmann_json)
+target_link_libraries(libparsex PUBLIC LibXml2::LibXml2 nlohmann_json::nlohmann_json
+                                       Boost::pfr)

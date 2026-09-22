@@ -5,6 +5,7 @@
         "libxml2",
         "nlohmann-json",
         "cli11",
-        "gtest"
+        "gtest",
+        "boost-pfr"
     ]
 }

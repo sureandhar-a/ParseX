@@ -4,6 +4,7 @@ add_executable(diff_tests
     path_matching_test.cpp
     diff_moves_test.cpp
     move_detection_test.cpp
+    diff_fields_test.cpp
 )
 target_link_libraries(
     diff_tests

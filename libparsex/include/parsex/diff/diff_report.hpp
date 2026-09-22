@@ -12,12 +12,14 @@
 
 enum class DiffKind { Added, Removed, Moved, Modified };
 
-// Defined empty here — PBI 3 "Generic field-level modification diffing"
-// (PAR-127) adds its actual members: field name, old value as string,
-// new value as string. Kept as a complete empty type (not a forward
-// declaration) because std::vector<FieldDiff> member moves require a
-// complete type on libc++.
-struct FieldDiff {};
+// Filled in by PBI 3 (PAR-127): field name plus old/new values as strings.
+// String-ified via the diffFields toString() overload set (numeric types,
+// strings, enums via per-enum name tables).
+struct FieldDiff {
+    std::string fieldName;
+    std::string oldValue;
+    std::string newValue;
+};
 
 struct DiffEntry {
     DiffKind kind = DiffKind::Added;
