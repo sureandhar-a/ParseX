@@ -55,6 +55,10 @@ struct DiffReport {
     // PBI 4 "Deterministic diff report ordering and rendering" owns the real
     // text/JSON output).
     [[nodiscard]] std::string toDebugString() const;
+
+    // Deterministic ordering pass (PAR-131): sort entries by stable path key
+    // so output never depends on hash-map iteration order.
+    void sortDeterministically();
 };
 
 [[nodiscard]] std::string toString(DiffKind kind);

@@ -1,5 +1,6 @@
 #include <parsex/diff/diff_report.hpp>
 
+#include <algorithm>
 #include <iterator>
 #include <ostream>
 #include <sstream>
@@ -70,4 +71,42 @@ std::string DiffReport::toDebugString() const {
     std::ostringstream oss;
     oss << *this;
     return oss.str();
+}
+
+namespace {
+
+// Stable sort key per entry: newPath for Added/Modified, oldPath for
+// Removed, and — consistently — newPath for Moved (a moved element's new
+// location is what a reviewer looks up; documented here so future readers
+// don't have to guess which path Moved sorts by).
+std::string sortKeyFor(const DiffEntry& entry) {
+    switch (entry.kind) {
+        case DiffKind::Added:
+        case DiffKind::Modified:
+        case DiffKind::Moved:
+            return entry.newPath;
+        case DiffKind::Removed:
+            return entry.oldPath;
+    }
+    return {};
+}
+
+}  // namespace
+
+void DiffReport::sortDeterministically() {
+    std::sort(entries.begin(), entries.end(), [](const DiffEntry& a, const DiffEntry& b) {
+        const std::string ka = sortKeyFor(a);
+        const std::string kb = sortKeyFor(b);
+        if (ka != kb) {
+            return ka < kb;
+        }
+        return a.elementType < b.elementType;
+    });
+    std::sort(diagnostics.begin(), diagnostics.end(), [](const DiffDiagnostic& a,
+                                                          const DiffDiagnostic& b) {
+        if (a.message != b.message) {
+            return a.message < b.message;
+        }
+        return a.elementType < b.elementType;
+    });
 }
