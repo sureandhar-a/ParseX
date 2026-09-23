@@ -22,6 +22,7 @@ add_library(libparsex STATIC
     src/validator/validator_can.cpp
     src/validator/validator_facade.cpp
     src/write/write_context.cpp
+    src/write/write_elements.cpp
 )
 
 # Tell targets linking against libparsex where to find its header files
