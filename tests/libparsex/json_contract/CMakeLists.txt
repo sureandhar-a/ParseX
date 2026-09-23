@@ -3,6 +3,7 @@ add_executable(json_contract_tests
     conventions_test.cpp
     version_test.cpp
     versioning_test.cpp
+    validator_smoke_test.cpp
 )
 target_link_libraries(
     json_contract_tests
