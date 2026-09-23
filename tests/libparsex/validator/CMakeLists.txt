@@ -18,5 +18,6 @@ target_compile_definitions(
     validator_tests
     PRIVATE
     PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+    PARSEX_SCHEMAS_DIR="${CMAKE_SOURCE_DIR}/schemas"
 )
 gtest_discover_tests(validator_tests)

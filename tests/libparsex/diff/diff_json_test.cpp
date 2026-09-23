@@ -1,7 +1,10 @@
 // Unit tests for structured JSON renderer (PAR-133, envelope-migrated PAR-174).
 #include <gtest/gtest.h>
 
+#include <filesystem>
+
 #include <parsex/diff/diff_report.hpp>
+#include <parsex/json_contract/schema_validate.hpp>
 #include <parsex/json_contract/version.hpp>
 #include <parsex/version.hpp>
 
@@ -83,4 +86,17 @@ TEST(DiffJsonTest, RoundTripPreservesAllFields) {
     }
     ASSERT_EQ(restored.diagnostics.size(), original.diagnostics.size());
     EXPECT_EQ(restored.diagnostics[0].message, "note");
+}
+
+TEST(DiffJsonTest, ToJsonConformsToEnvelopeSchema) {
+#ifdef PARSEX_SCHEMAS_DIR
+    const std::filesystem::path schemaPath =
+        std::filesystem::path(PARSEX_SCHEMAS_DIR) / "envelope.schema.json";
+#else
+    const std::filesystem::path schemaPath = "schemas/envelope.schema.json";
+#endif
+    std::string error;
+    EXPECT_TRUE(parsex::json_contract::validatesAgainstSchema(sampleReport().toJson(), schemaPath,
+                                                              &error))
+        << error;
 }

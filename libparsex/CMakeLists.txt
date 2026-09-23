@@ -9,6 +9,7 @@ add_library(libparsex STATIC
     src/release_detector.cpp
     src/model_builder.cpp
     src/parser.cpp
+    src/json_contract/schema_validate.cpp
     src/diff/diff_report.cpp
     src/diff/diff_match.cpp
     src/diff/diff_moves.cpp

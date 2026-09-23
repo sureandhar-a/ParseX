@@ -5,6 +5,7 @@ add_executable(json_contract_tests
     versioning_test.cpp
     validator_smoke_test.cpp
     payload_schemas_test.cpp
+    schema_conformance_test.cpp
 )
 target_link_libraries(
     json_contract_tests
