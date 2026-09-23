@@ -1,4 +1,5 @@
 #include <parsex/write/write_elements.hpp>
+#include <parsex/write/write_ordering.hpp>
 
 #include <cstdint>
 #include <string>
@@ -59,7 +60,7 @@ xmlNodePtr buildEcuInstanceElement(xmlDocPtr doc, const EcuInstance& value) {
         xmlNodePtr channels = appendChild(node, "CONNECTED-CHANNELS");
         for (const std::string& channel : value.connectedChannels) {
             xmlNodePtr ref = appendChild(channels, "CHANNEL-REF");
-            xmlNewProp(ref, BAD_CAST "DEST", BAD_CAST "PHYSICAL-CHANNEL");
+            setSortedAttributes(ref, {{"DEST", "PHYSICAL-CHANNEL"}});
             setNodeText(ref, "/Sys/" + channel);
         }
     }
@@ -84,7 +85,7 @@ xmlNodePtr buildFrameElement(xmlDocPtr doc, const Frame& value) {
         xmlNodePtr transmitters = appendChild(node, "TRANSMITTERS");
         for (const std::string& ecu : value.transmitters) {
             xmlNodePtr ref = appendChild(transmitters, "TRANSMITTER-REF");
-            xmlNewProp(ref, BAD_CAST "DEST", BAD_CAST "ECU-INSTANCE");
+            setSortedAttributes(ref, {{"DEST", "ECU-INSTANCE"}});
             setNodeText(ref, "/Sys/" + ecu);
         }
     }
@@ -98,7 +99,7 @@ xmlNodePtr buildFrameElement(xmlDocPtr doc, const Frame& value) {
             appendTextChild(entry, "SHORT-NAME",
                             value.common.shortName + "_" + mapping.pduShortNameRef);
             xmlNodePtr ref = appendChild(entry, "PDU-REF");
-            xmlNewProp(ref, BAD_CAST "DEST", BAD_CAST "PDU");
+            setSortedAttributes(ref, {{"DEST", "PDU"}});
             setNodeText(ref, "/Sys/" + mapping.pduShortNameRef);
             appendTextChild(entry, "START-POSITION",
                             std::to_string(mapping.startPosition));
@@ -119,7 +120,7 @@ xmlNodePtr buildPduElement(xmlDocPtr doc, const Pdu& value) {
             appendTextChild(entry, "SHORT-NAME",
                             value.common.shortName + "_" + mapping.signalShortNameRef);
             xmlNodePtr ref = appendChild(entry, "SIGNAL-REF");
-            xmlNewProp(ref, BAD_CAST "DEST", BAD_CAST "SYSTEM-SIGNAL");
+            setSortedAttributes(ref, {{"DEST", "SYSTEM-SIGNAL"}});
             setNodeText(ref, "/Sys/" + mapping.signalShortNameRef);
             appendTextChild(entry, "START-POSITION",
                             std::to_string(mapping.startPosition));
@@ -148,7 +149,7 @@ xmlNodePtr buildSignalElement(xmlDocPtr doc, const Signal& value) {
         xmlNodePtr receivers = appendChild(node, "RECEIVERS");
         for (const std::string& ecu : value.receivers) {
             xmlNodePtr ref = appendChild(receivers, "RECEIVER-REF");
-            xmlNewProp(ref, BAD_CAST "DEST", BAD_CAST "ECU-INSTANCE");
+            setSortedAttributes(ref, {{"DEST", "ECU-INSTANCE"}});
             setNodeText(ref, "/Sys/" + ecu);
         }
     }
@@ -166,7 +167,7 @@ xmlNodePtr buildSignalGroupElement(xmlDocPtr doc, const SignalGroup& value) {
             // DEST-typed ref whose text reduces to the short name after the
             // last '/' — reuse exactly, never a new convention.
             xmlNodePtr ref = appendChild(members, "SYSTEM-SIGNAL-REF");
-            xmlNewProp(ref, BAD_CAST "DEST", BAD_CAST "SYSTEM-SIGNAL");
+            setSortedAttributes(ref, {{"DEST", "SYSTEM-SIGNAL"}});
             setNodeText(ref, "/Sys/" + member);
         }
     }
