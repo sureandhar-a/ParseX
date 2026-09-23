@@ -1,0 +1,30 @@
+add_executable(diff_tests
+    diff_report_test.cpp
+    diff_match_test.cpp
+    path_matching_test.cpp
+    diff_moves_test.cpp
+    move_detection_test.cpp
+    diff_fields_test.cpp
+    diff_nested_test.cpp
+    diff_populate_test.cpp
+    field_diffing_test.cpp
+    diff_sort_test.cpp
+    diff_text_test.cpp
+    diff_json_test.cpp
+    diff_golden_test.cpp
+    diff_engine_test.cpp
+    diff_e2e_test.cpp
+)
+target_link_libraries(
+    diff_tests
+    PRIVATE
+    libparsex
+    GTest::gtest
+    GTest::gtest_main
+)
+target_compile_definitions(
+    diff_tests
+    PRIVATE
+    DIFF_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden"
+)
+gtest_discover_tests(diff_tests)

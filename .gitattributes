@@ -4,3 +4,6 @@
 # assertions (which is precisely what they exist to verify). See the Windows
 # CI failure fixed alongside this file: startOffset 40 vs 39, size 348 vs 347.
 *.arxml text eol=lf
+# Diff Engine golden files are byte-compared against LF-generated output, so
+# they need the same treatment (Windows CI failure on PAR-134 goldens).
+tests/libparsex/diff/golden/* text eol=lf
