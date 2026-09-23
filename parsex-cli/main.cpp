@@ -1,9 +1,50 @@
 #include <iostream>
 #include <string>
 #include "CLI/CLI.hpp"
+#include <nlohmann/json.hpp>
+#include "parsex/diff/diff_report.hpp"
+#include "parsex/json_contract/envelope.hpp"
+#include "parsex/validator/validation_result.hpp"
 #include "parsex/version.hpp"
 
 using namespace std;
+
+namespace {
+
+// PAR-213: human-readable placeholders (real formatting arrives in PAR-206).
+inline std::string formatHumanParse(const std::string& input) {
+    return "Parsed " + input + " (placeholder)";
+}
+inline std::string formatHumanValidate(const std::string& input) {
+    return "Validated " + input + ": OK (placeholder)";
+}
+inline std::string formatHumanDiff(const std::string& base, const std::string& target) {
+    return "Diff " + base + " vs " + target + ": no differences (placeholder)";
+}
+inline std::string formatHumanWrite(const std::string& input) {
+    return "Wrote " + input + " (placeholder, dry-run)";
+}
+
+// PAR-213: JSON branches via the shared Output Contract helper so
+// contractVersion/toolVersion never diverge with CLI-local copies.
+// validate/diff reuse the engines' own toJson() (already envelope-wrapped
+// and schema-valid); parse/write use wrapEnvelope() directly with placeholder
+// payloads until PAR-206 wires the real engines (schema extension for the new
+// kinds tracked there).
+inline nlohmann::json buildJsonParse(const std::string& input) {
+    return parsex::json_contract::wrapEnvelope("parseReport", {{"input", input}});
+}
+inline nlohmann::json buildJsonValidate() {
+    return ValidationResult{}.toJson();
+}
+inline nlohmann::json buildJsonDiff() {
+    return DiffReport{}.toJson();
+}
+inline nlohmann::json buildJsonWrite(const std::string& input) {
+    return parsex::json_contract::wrapEnvelope("writeResult", {{"input", input}});
+}
+
+}  // namespace
 
 int main(int argc, char const *argv[])
 {
@@ -47,21 +88,32 @@ int main(int argc, char const *argv[])
     diffCmd->add_option("--base", diffBase, "Base ARXML file")->required()->check(CLI::ExistingFile);
     diffCmd->add_option("--target", diffTarget, "Target ARXML file")->required()->check(CLI::ExistingFile);
     parseCmd->callback([&]() {
-        (void)opts.jsonOutput;
-        (void)parseInput;
+        if (opts.jsonOutput) {
+            std::cout << buildJsonParse(parseInput).dump(2) << "\n";
+        } else {
+            std::cout << formatHumanParse(parseInput) << "\n";
+        }
     });
     validateCmd->callback([&]() {
-        (void)opts.jsonOutput;
-        (void)validateInput;
+        if (opts.jsonOutput) {
+            std::cout << buildJsonValidate().dump(2) << "\n";
+        } else {
+            std::cout << formatHumanValidate(validateInput) << "\n";
+        }
     });
     diffCmd->callback([&]() {
-        (void)opts.jsonOutput;
-        (void)diffBase;
-        (void)diffTarget;
+        if (opts.jsonOutput) {
+            std::cout << buildJsonDiff().dump(2) << "\n";
+        } else {
+            std::cout << formatHumanDiff(diffBase, diffTarget) << "\n";
+        }
     });
     writeCmd->callback([&]() {
-        (void)opts.jsonOutput;
-        (void)writeInput;
+        if (opts.jsonOutput) {
+            std::cout << buildJsonWrite(writeInput).dump(2) << "\n";
+        } else {
+            std::cout << formatHumanWrite(writeInput) << "\n";
+        }
     });
     (void)parseCmd;
     (void)validateCmd;
