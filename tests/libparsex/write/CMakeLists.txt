@@ -10,6 +10,7 @@ add_executable(write_tests
     limitation_test.cpp
     facade_test.cpp
     error_handling_test.cpp
+    write_e2e_test.cpp
 )
 target_compile_definitions(
     write_tests

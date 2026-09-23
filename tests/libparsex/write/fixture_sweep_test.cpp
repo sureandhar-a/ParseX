@@ -6,6 +6,7 @@
 
 #include <parsex/parser/parser.hpp>
 #include <parsex/schema/schema_registry.hpp>
+#include <parsex/schema/schema_resolution_error.hpp>
 #include <parsex/validator/validator.hpp>
 #include <parsex/write/write_engine.hpp>
 
@@ -131,7 +132,16 @@ TEST(FixtureSweepTest, WrittenOutputIsSchemaValid) {
         const auto written = writeProject(project, "parsex_sweep_" + name);
         ParsedFile writtenFile;
         writtenFile.sourcePath = written;
-        const SchemaResolutionResult resolved = resolveSchema(release);
+        // User-supplied AUTOSAR XSDs are gitignored (see
+        // resources/schemas/README.md): skip where they are absent (e.g. CI),
+        // following schema_registry_integration_test.cpp's precedent.
+        SchemaResolutionResult resolved;
+        try {
+            resolved = resolveSchema(release);
+        } catch (const SchemaResolutionError& error) {
+            GTEST_SKIP() << "user-supplied " << release << " schema not present: "
+                         << error.what();
+        }
         const ValidationResult result =
             Validator{}.validateSchema(writtenFile, resolved.schema.schemaHandle.get());
         EXPECT_TRUE(result.errors.empty()) << name << ": " << [&] {
