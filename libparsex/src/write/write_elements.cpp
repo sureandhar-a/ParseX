@@ -88,8 +88,22 @@ xmlNodePtr buildFrameElement(xmlDocPtr doc, const Frame& value) {
             setNodeText(ref, "/Sys/" + ecu);
         }
     }
-    // TODO(PAR-146): Frame PDU-triggering mappings (FRAME-PDU / PDU-REF /
-    // START-POSITION) — nested-collection structure goes here.
+    if (!value.pdus.empty()) {
+        xmlNodePtr pdus = appendChild(node, "PDUS");
+        for (const FramePduMapping& mapping : value.pdus) {
+            xmlNodePtr entry = appendChild(pdus, "FRAME-PDU");
+            // FRAME-PDU carries its own SHORT-NAME in real files; synthesize
+            // deterministically (owner + target) — the Parser only reads
+            // PDU-REF / START-POSITION, so this never affects round-trip.
+            appendTextChild(entry, "SHORT-NAME",
+                            value.common.shortName + "_" + mapping.pduShortNameRef);
+            xmlNodePtr ref = appendChild(entry, "PDU-REF");
+            xmlNewProp(ref, BAD_CAST "DEST", BAD_CAST "PDU");
+            setNodeText(ref, "/Sys/" + mapping.pduShortNameRef);
+            appendTextChild(entry, "START-POSITION",
+                            std::to_string(mapping.startPosition));
+        }
+    }
     return node;
 }
 
@@ -98,8 +112,20 @@ xmlNodePtr buildPduElement(xmlDocPtr doc, const Pdu& value) {
     xmlNodePtr node = xmlNewNode(nullptr, BAD_CAST "PDU");
     appendTextChild(node, "SHORT-NAME", value.common.shortName);
     appendTextChild(node, "LENGTH", std::to_string(value.length));
-    // TODO(PAR-146): Pdu signal mappings (PDU-SIGNAL-MAPPING / SIGNAL-REF /
-    // START-POSITION / BYTE-ORDER) — nested-collection structure goes here.
+    if (!value.signalMappings.empty()) {
+        xmlNodePtr mappings = appendChild(node, "SIGNAL-MAPPINGS");
+        for (const PduSignalMapping& mapping : value.signalMappings) {
+            xmlNodePtr entry = appendChild(mappings, "PDU-SIGNAL-MAPPING");
+            appendTextChild(entry, "SHORT-NAME",
+                            value.common.shortName + "_" + mapping.signalShortNameRef);
+            xmlNodePtr ref = appendChild(entry, "SIGNAL-REF");
+            xmlNewProp(ref, BAD_CAST "DEST", BAD_CAST "SYSTEM-SIGNAL");
+            setNodeText(ref, "/Sys/" + mapping.signalShortNameRef);
+            appendTextChild(entry, "START-POSITION",
+                            std::to_string(mapping.startPosition));
+            appendTextChild(entry, "BYTE-ORDER", byteOrderToString(mapping.byteOrder));
+        }
+    }
     return node;
 }
 
@@ -110,8 +136,14 @@ xmlNodePtr buildSignalElement(xmlDocPtr doc, const Signal& value) {
     appendTextChild(node, "START-BIT", std::to_string(value.startBit));
     appendTextChild(node, "BIT-LENGTH", std::to_string(value.bitLength));
     appendTextChild(node, "BYTE-ORDER", byteOrderToString(value.byteOrder));
-    // TODO(PAR-146): value-table entries (VALUE-TABLE / VALUE-TABLE-ENTRY /
-    // VALUE / LABEL) — nested-collection structure goes here.
+    if (value.valueTable.has_value()) {
+        xmlNodePtr table = appendChild(node, "VALUE-TABLE");
+        for (const ValueTableEntry& entry : value.valueTable.value()) {
+            xmlNodePtr item = appendChild(table, "VALUE-TABLE-ENTRY");
+            appendTextChild(item, "VALUE", std::to_string(entry.value));
+            appendTextChild(item, "LABEL", entry.label);
+        }
+    }
     if (!value.receivers.empty()) {
         xmlNodePtr receivers = appendChild(node, "RECEIVERS");
         for (const std::string& ecu : value.receivers) {
@@ -127,7 +159,16 @@ xmlNodePtr buildSignalGroupElement(xmlDocPtr doc, const SignalGroup& value) {
     (void)doc;
     xmlNodePtr node = xmlNewNode(nullptr, BAD_CAST "SIGNAL-GROUP");
     appendTextChild(node, "SHORT-NAME", value.common.shortName);
-    // TODO(PAR-146): SignalGroup member-signal list (MEMBERS /
-    // SYSTEM-SIGNAL-REF) — nested-collection structure goes here.
+    if (!value.members.empty()) {
+        xmlNodePtr members = appendChild(node, "MEMBERS");
+        for (const std::string& member : value.members) {
+            // Reference encoding matches the Parser's REF resolution (PAR-94):
+            // DEST-typed ref whose text reduces to the short name after the
+            // last '/' — reuse exactly, never a new convention.
+            xmlNodePtr ref = appendChild(members, "SYSTEM-SIGNAL-REF");
+            xmlNewProp(ref, BAD_CAST "DEST", BAD_CAST "SYSTEM-SIGNAL");
+            setNodeText(ref, "/Sys/" + member);
+        }
+    }
     return node;
 }
