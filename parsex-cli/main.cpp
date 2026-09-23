@@ -6,6 +6,7 @@
 #include "parsex/json_contract/envelope.hpp"
 #include "parsex/validator/validation_result.hpp"
 #include "parsex/version.hpp"
+#include "color.hpp"
 
 using namespace std;
 
@@ -60,13 +61,17 @@ int main(int argc, char const *argv[])
     // PAR-206 branches on jsonOutput without re-parsing.
     struct CliOptions {
         bool jsonOutput{false};
+        bool noColor{false};
     };
     CliOptions opts;
     app.add_flag("--json", opts.jsonOutput, "Emit machine-readable JSON instead of human-readable text");
+    app.add_flag("--no-color", opts.noColor, "Disable colored output");
     // NOTE (PAR-212): CLI11 resolves `--json` before the subcommand
     // (`parsex --json parse ...`). `parsex parse --json ...` is rejected
     // unless each subcommand re-declares the flag or fallthrough is enabled;
     // single top-level flag kept intentionally, documented here.
+    // NOTE (PAR-214): human formatters gate any future ANSI codes behind
+    // parsex::cli::colorEnabled(opts.noColor); no colored output exists yet.
 
     auto* parseCmd = app.add_subcommand("parse", "Parse an ARXML file and report its structure");
     auto* validateCmd = app.add_subcommand("validate", "Validate an ARXML file against ParseX rules");
