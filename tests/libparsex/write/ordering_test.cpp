@@ -107,7 +107,7 @@ TEST(ElementSortTest, SignalGroupMembersSerializeInShortNameOrder) {
     group.members = {"Signal_C", "Signal_A", "Signal_B"};
     xmlNodePtr node = buildSignalGroupElement(ctx.doc(), group);
     ASSERT_NE(node, nullptr);
-    EXPECT_EQ(refTexts(node, "MEMBERS", "SYSTEM-SIGNAL-REF"),
+    EXPECT_EQ(refTexts(node, "I-SIGNAL-REFS", "I-SIGNAL-REF"),
               std::vector<std::string>({"/Sys/Signal_A", "/Sys/Signal_B", "/Sys/Signal_C"}));
     xmlFreeNode(node);
 }
@@ -123,7 +123,7 @@ TEST(ElementSortTest, PduSignalMappingsSerializeInShortNameOrder) {
         {.signalShortNameRef = "Sig_B"}};
     xmlNodePtr node = buildPduElement(ctx.doc(), pdu);
     ASSERT_NE(node, nullptr);
-    EXPECT_EQ(refTexts(node, "SIGNAL-MAPPINGS", "SIGNAL-REF"),
+    EXPECT_EQ(refTexts(node, "I-SIGNAL-TO-PDU-MAPPINGS", "I-SIGNAL-REF"),
               std::vector<std::string>({"/Sys/Sig_A", "/Sys/Sig_B", "/Sys/Sig_C"}));
     xmlFreeNode(node);
 }

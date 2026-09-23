@@ -13,13 +13,16 @@
 #include <string>
 
 inline DiffReport roundTripDiff(const std::filesystem::path& originalArxmlPath) {
-    const ParsedProject original =
-        Parser{}.parseProject({originalArxmlPath}, FileDiscoveryMode::ExplicitList);
+    // parseFile (not parseProject): round-trip equality is per-file, and
+    // real-world fixtures (e.g. system-4.2.arxml) reference PDU types outside
+    // the six built families, which parseProject's cross-file gate rejects.
+    ParsedProject original;
+    original.files.push_back(Parser{}.parseFile(originalArxmlPath));
     const std::filesystem::path temp =
         std::filesystem::temp_directory_path() / "parsex_roundtrip_tmp.arxml";
     WriteEngine{}.write(original, temp);
-    const ParsedProject reparsed =
-        Parser{}.parseProject({temp}, FileDiscoveryMode::ExplicitList);
+    ParsedProject reparsed;
+    reparsed.files.push_back(Parser{}.parseFile(temp));
     std::error_code dropError;
     std::filesystem::remove(temp, dropError);
     return DiffEngine{}.diff(original, reparsed);

@@ -13,7 +13,7 @@ namespace {
 
 template <typename T, typename KeyFn>
 std::vector<T> sortedCopy(std::vector<T> items, KeyFn key) {
-    std::ranges::sort(items, {}, key);
+    std::ranges::stable_sort(items, {}, key);
     return items;
 }
 

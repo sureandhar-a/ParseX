@@ -57,8 +57,24 @@ TEST(RoundTripHelperTest, TrivialSingleFrameFixtureReturnsEmptyDiff) {
     std::filesystem::remove(path, ignored);
 }
 
-TEST(RoundTripHelperTest, CompleteFixtureRoundTripsCleanly) {
-    assertRoundTripsCleanly(fixture("parsefile_complete.arxml"));
+TEST(RoundTripHelperTest, RealFixtureRoundTripsCleanly) {
+    // system-4.2.arxml is real vocabulary with empty study-only REF fields,
+    // so the real-vocabulary writer round-trips it exactly.
+    assertRoundTripsCleanly(fixture("system-4.2.arxml"));
+}
+
+TEST(RoundTripHelperTest, StudyFixtureDocumentsRealVocabRefLimitation) {
+    // Accepted pivot trade-off: parsefile_complete.arxml populates three
+    // study-only REF fields with no single-node schema-valid home
+    // (EcuInstance.connectedChannels, Frame.transmitters, Signal.receivers),
+    // so its round-trip diff names exactly those — documented here as an
+    // intentional scope decision, not a bug (cf. PAR-156).
+    const DiffReport report = roundTripDiff(fixture("parsefile_complete.arxml"));
+    EXPECT_FALSE(report.empty());
+    const std::string text = report.toText();
+    EXPECT_NE(text.find("connectedChannels"), std::string::npos);
+    EXPECT_NE(text.find("transmitters"), std::string::npos);
+    EXPECT_NE(text.find("receivers"), std::string::npos);
 }
 
 TEST(RoundTripHelperTest, BrokenWriteIsDetectedWithFieldDetails) {

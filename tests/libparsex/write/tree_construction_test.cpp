@@ -129,8 +129,8 @@ TEST(TreeConstructionTest, SignalGroupWithTwoMembers) {
     group.members = {"Signal_1", "Signal_2"};
     xmlNodePtr node = buildSignalGroupElement(ctx.doc(), group);
     ASSERT_NE(node, nullptr);
-    const xmlNode* members = findChild(node, "MEMBERS");
+    const xmlNode* members = findChild(node, "I-SIGNAL-REFS");
     ASSERT_NE(members, nullptr);
-    EXPECT_EQ(countChildren(members, "SYSTEM-SIGNAL-REF"), 2);
+    EXPECT_EQ(countChildren(members, "I-SIGNAL-REF"), 2);
     xmlFreeNode(node);
 }

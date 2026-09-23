@@ -93,7 +93,7 @@ TEST(PrettyPrintTest, NoCollapsedSectionsOrTrailingWhitespace) {
     const std::string text = readFile(path);
     // Indentation present at depth (no collapsed sections).
     EXPECT_NE(text.find("\n      <ELEMENTS>"), std::string::npos);
-    EXPECT_NE(text.find("\n        <CLUSTER>"), std::string::npos);
+    EXPECT_NE(text.find("\n        <CAN-CLUSTER>"), std::string::npos);
     EXPECT_NE(text.find("\n          <SHORT-NAME>CAN_Cluster</SHORT-NAME>"), std::string::npos);
     EXPECT_FALSE(hasTrailingWhitespaceLine(text));
     std::filesystem::remove(path);

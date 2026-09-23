@@ -9,14 +9,16 @@
 #include <parsex/model/signal.hpp>
 #include <parsex/model/signal_group.hpp>
 
-// Per-domain-type element builders (PAR-145): one function per domain type,
-// mapping fields to the same AUTOSAR element names the Parser/Loader already
-// reads (study vocabulary — see model_builder.hpp and
-// tests/fixtures/parsefile_complete.arxml), so read and write stay in sync.
+// Per-domain-type element builders (PAR-145/146, post-pivot): one function
+// per domain type emitting REAL AUTOSAR 4.x vocabulary (CAN-CLUSTER,
+// ECU-INSTANCE, CAN-FRAME, I-SIGNAL-I-PDU, I-SIGNAL, I-SIGNAL-GROUP —
+// verified against resources/schemas/4.4.0.xsd), using the same element names
+// the Parser/Loader already reads, so read and write stay in sync and output
+// is genuinely schema-valid ARXML.
 //
 // Each builder creates a detached element (caller attaches via xmlAddChild).
-// Nested-collection fields (SignalGroup members, Frame PDU mappings, Pdu
-// signal mappings, value tables) are TODO for PAR-146 — see markers below.
+// See write_elements.cpp for the v1 scope limits (fields with no
+// single-node schema-valid home).
 xmlNodePtr buildClusterElement(xmlDocPtr doc, const Cluster& value);
 xmlNodePtr buildEcuInstanceElement(xmlDocPtr doc, const EcuInstance& value);
 xmlNodePtr buildFrameElement(xmlDocPtr doc, const Frame& value);
