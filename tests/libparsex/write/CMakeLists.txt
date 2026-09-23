@@ -5,6 +5,12 @@ add_executable(write_tests
     whitespace_guard_test.cpp
     file_output_test.cpp
     pretty_print_test.cpp
+    roundtrip_test.cpp
+)
+target_compile_definitions(
+    write_tests
+    PRIVATE
+    PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
 )
 target_link_libraries(
     write_tests
@@ -12,10 +18,5 @@ target_link_libraries(
     libparsex
     GTest::gtest
     GTest::gtest_main
-)
-target_compile_definitions(
-    write_tests
-    PRIVATE
-    PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
 )
 gtest_discover_tests(write_tests)
