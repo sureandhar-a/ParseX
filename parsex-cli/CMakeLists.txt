@@ -42,3 +42,18 @@ add_test(NAME cli.version
     COMMAND $<TARGET_FILE:parsex-cli> --version)
 set_tests_properties(cli.version PROPERTIES
     PASS_REGULAR_EXPRESSION "[0-9]+\\.[0-9]+\\.[0-9]+")
+
+# PAR-215: JSON schema conformance and human/JSON mutual exclusivity (real
+# binary; full schema validation lives in tests/cli/json_output_test.cpp via
+# validatesAgainstSchema() — these CTest entries keep the checks visible
+# alongside the PAR-211 smoke tests).
+add_test(NAME cli.json_validate_output
+    COMMAND $<TARGET_FILE:parsex-cli> --json validate --input ${CMAKE_SOURCE_DIR}/tests/fixtures/tiny_valid.arxml)
+set_tests_properties(cli.json_validate_output PROPERTIES
+    PASS_REGULAR_EXPRESSION "validationResult")
+
+add_test(NAME cli.human_output_not_json
+    COMMAND $<TARGET_FILE:parsex-cli> parse --input ${CMAKE_SOURCE_DIR}/tests/fixtures/tiny_valid.arxml)
+set_tests_properties(cli.human_output_not_json PROPERTIES
+    PASS_REGULAR_EXPRESSION "Parsed"
+    FAIL_REGULAR_EXPRESSION "contractVersion")
