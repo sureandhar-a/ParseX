@@ -9,6 +9,7 @@ add_executable(write_tests
     fixture_sweep_test.cpp
     limitation_test.cpp
     facade_test.cpp
+    error_handling_test.cpp
 )
 target_compile_definitions(
     write_tests

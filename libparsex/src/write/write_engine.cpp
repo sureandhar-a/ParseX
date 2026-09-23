@@ -21,6 +21,10 @@ std::vector<T> sortedCopy(std::vector<T> items, KeyFn key) {
 
 void WriteEngine::write(const ParsedProject& project,
                         const std::filesystem::path& outputPath) const {
+    const ValidationResult problems = validate(project);
+    if (problems.hasErrors()) {
+        throw WriteError(problems);
+    }
     // Schema version: first file's release wins (single-release projects in
     // v1); empty projects default to 4.4.0 (the fixture release).
     std::string release = "4.4.0";
@@ -84,5 +88,73 @@ void WriteEngine::write(const ParsedProject& project,
     }
 
     assertNoWhitespaceOnlyTextNodes(ctx.root());
-    writeXmlToFile(ctx.doc(), outputPath.string());
+    // Temp path + rename into place (same convention as writeCacheAtomically):
+    // a failed write() never leaves a partially-written file at outputPath.
+    const std::filesystem::path tempPath =
+        std::filesystem::path(outputPath.string() + ".parsex-tmp");
+    try {
+        writeXmlToFile(ctx.doc(), tempPath.string());
+        std::error_code renameError;
+        std::filesystem::rename(tempPath, outputPath, renameError);
+        if (renameError) {
+            throw std::runtime_error("parsex: failed to move written file into place '" +
+                                     outputPath.string() + "': " + renameError.message());
+        }
+    } catch (...) {
+        std::error_code dropError;
+        std::filesystem::remove(tempPath, dropError);
+        throw;
+    }
+}
+
+WriteError::WriteError(ValidationResult errors)
+    : std::runtime_error([&] {
+          std::string message = "parsex: cannot write project:";
+          for (const ValidationError& error : errors.errors) {
+              message += " [" + error.code + "] " + error.message;
+          }
+          return message;
+      }()),
+      result(std::move(errors)) {}
+
+namespace {
+
+void checkShortNames(const std::string& type,
+                     const std::vector<std::string>& shortNames, std::size_t fileIndex,
+                     ValidationResult& out) {
+    for (std::size_t idx = 0; idx < shortNames.size(); ++idx) {
+        if (!shortNames.at(idx).empty()) {
+            continue;
+        }
+        ValidationError error;
+        error.severity = Severity::Error;
+        error.code = "write.missing_field";
+        error.message = type + "[" + std::to_string(idx) + "] in file[" +
+                        std::to_string(fileIndex) + "] is missing required SHORT-NAME";
+        error.path = type + "[" + std::to_string(idx) + "]";
+        out.errors.push_back(std::move(error));
+    }
+}
+
+}  // namespace
+
+ValidationResult WriteEngine::validate(const ParsedProject& project) const {
+    ValidationResult result;
+    for (std::size_t fileIdx = 0; fileIdx < project.files.size(); ++fileIdx) {
+        const ParsedFile& file = project.files[fileIdx];
+        const auto names = [](const auto& items) {
+            std::vector<std::string> out;
+            for (const auto& item : items) {
+                out.push_back(item.common.shortName);
+            }
+            return out;
+        };
+        checkShortNames("Cluster", names(file.clusters), fileIdx, result);
+        checkShortNames("EcuInstance", names(file.ecuInstances), fileIdx, result);
+        checkShortNames("Frame", names(file.frames), fileIdx, result);
+        checkShortNames("Pdu", names(file.pdus), fileIdx, result);
+        checkShortNames("Signal", names(file.signals), fileIdx, result);
+        checkShortNames("SignalGroup", names(file.signalGroups), fileIdx, result);
+    }
+    return result;
 }
