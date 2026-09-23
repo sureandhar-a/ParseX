@@ -17,6 +17,12 @@ reading required.
 * [`diff_report.schema.json`](diff_report.schema.json) — `kind: "diffReport"`
   payload: `entries` (`kind`, `elementType`, optional `oldPath`/`newPath`,
   `fieldDiffs`) plus `diagnostics`.
+* [`telemetry_report.schema.json`](telemetry_report.schema.json) — `kind:
+  "telemetryReport"` payload: flat `spans` array (`spanId`, optional
+  `parentSpanId`, `name`, `startNanos`/`endNanos`/`durationNanos`, `status`,
+  `attributes`). Local-only instrumentation — see
+  [`TELEMETRY_SCOPE.md`](TELEMETRY_SCOPE.md) for the deliberate no-phone-home
+  scoping decision.
 * [`CONVENTIONS.md`](CONVENTIONS.md) — field-naming (camelCase), null-handling
   (omit, don't null), and forward-compatibility (consumers ignore unknown
   fields) rules every payload schema is reviewed against.
