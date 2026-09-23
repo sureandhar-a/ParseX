@@ -1,0 +1,16 @@
+add_executable(write_tests
+    tree_construction_test.cpp
+)
+target_link_libraries(
+    write_tests
+    PRIVATE
+    libparsex
+    GTest::gtest
+    GTest::gtest_main
+)
+target_compile_definitions(
+    write_tests
+    PRIVATE
+    PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+)
+gtest_discover_tests(write_tests)
