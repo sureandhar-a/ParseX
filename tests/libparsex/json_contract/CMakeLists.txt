@@ -1,5 +1,6 @@
 add_executable(json_contract_tests
     envelope_schema_test.cpp
+    conventions_test.cpp
 )
 target_link_libraries(
     json_contract_tests
@@ -12,5 +13,6 @@ target_compile_definitions(
     json_contract_tests
     PRIVATE
     PARSEX_ENVELOPE_SCHEMA_FILE="${CMAKE_SOURCE_DIR}/schemas/envelope.schema.json"
+    PARSEX_CONVENTIONS_FILE="${CMAKE_SOURCE_DIR}/schemas/CONVENTIONS.md"
 )
 gtest_discover_tests(json_contract_tests)
