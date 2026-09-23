@@ -10,3 +10,13 @@ target_link_libraries(
     GTest::gtest_main
 )
 gtest_discover_tests(telemetry_tests)
+
+# Standalone overhead benchmark (PAR-192): not part of CTest, run manually.
+add_executable(telemetry_overhead_bench
+    telemetry_overhead_bench.cpp
+)
+target_link_libraries(
+    telemetry_overhead_bench
+    PRIVATE
+    libparsex
+)
