@@ -12,6 +12,8 @@ add_library(libparsex STATIC
     src/json_contract/envelope.cpp
     src/json_contract/schema_validate.cpp
     src/telemetry/span_status.cpp
+    src/telemetry/span_id.cpp
+    src/telemetry/trace.cpp
     src/diff/diff_report.cpp
     src/diff/diff_match.cpp
     src/diff/diff_moves.cpp
