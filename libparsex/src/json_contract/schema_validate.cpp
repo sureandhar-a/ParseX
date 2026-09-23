@@ -10,12 +10,12 @@ namespace parsex::json_contract {
 namespace {
 
 nlohmann::json loadJsonFile(const std::filesystem::path& path, std::string* errorOut) {
-    std::ifstream in(path);
-    if (!in.good()) {
+    std::ifstream schemaFile(path);
+    if (!schemaFile.good()) {
         throw std::runtime_error("cannot open schema file: " + path.string());
     }
     std::ostringstream raw;
-    raw << in.rdbuf();
+    raw << schemaFile.rdbuf();
     try {
         return nlohmann::json::parse(raw.str());
     } catch (const std::exception& ex) {
@@ -83,13 +83,13 @@ bool validatesAgainstSchema(const nlohmann::json& document,
     // Resolve the envelope's relative $refs from the schema file's directory.
     const std::filesystem::path baseDir = schemaPath.parent_path();
     auto loader = [&](const nlohmann::json_uri& uri, nlohmann::json& value) {
-        const std::string id = uri.to_string();
+        const std::string uriString = uri.to_string();
         // Match by filename suffix so both relative refs
         // ("validation_result.schema.json") and $id URLs
         // ("https://parsex.dev/schemas/v1/validation_result.json") resolve.
         for (const char* file : {"validation_result.schema.json", "diff_report.schema.json",
-                                 "envelope.schema.json"}) {
-            if (id.find(file) != std::string::npos) {
+                                 "envelope.schema.json",}) {
+            if (uriString.find(file) != std::string::npos) {
                 try {
                     value = loadJsonFile(baseDir / file, errorOut);
                 } catch (const std::exception& ex) {
@@ -98,7 +98,7 @@ bool validatesAgainstSchema(const nlohmann::json& document,
                 return;
             }
         }
-        throw std::runtime_error("schemaLoader: unrecognized ref " + id);
+        throw std::runtime_error("schemaLoader: unrecognized ref " + uriString);
     };
 
     try {

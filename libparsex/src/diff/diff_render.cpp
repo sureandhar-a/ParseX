@@ -167,7 +167,7 @@ DiffReport DiffReport::fromJson(const nlohmann::json& jsonDoc) {
             entry.fieldDiffs.push_back(
                 {.fieldName = fieldJson.at("field").get<std::string>(),
                  .oldValue = fieldJson.at("oldValue").get<std::string>(),
-                 .newValue = fieldJson.at("newValue").get<std::string>()});
+                 .newValue = fieldJson.at("newValue").get<std::string>(),});
         }
         report.entries.push_back(std::move(entry));
     }
@@ -175,7 +175,7 @@ DiffReport DiffReport::fromJson(const nlohmann::json& jsonDoc) {
         for (const auto& diagJson : payload.at("diagnostics")) {
             report.diagnostics.push_back(
                 {.message = diagJson.at("message").get<std::string>(),
-                 .elementType = diagJson.at("elementType").get<std::string>()});
+                 .elementType = diagJson.at("elementType").get<std::string>(),});
         }
     }
     return report;
