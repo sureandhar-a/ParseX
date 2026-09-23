@@ -49,6 +49,10 @@ void schemaLoader(const nlohmann::json_uri& uri, nlohmann::json& value) {
         value = loadJsonFile(dir / "diff_report.schema.json");
         return;
     }
+    if (id.find("telemetry_report") != std::string::npos) {
+        value = loadJsonFile(dir / "telemetry_report.schema.json");
+        return;
+    }
     throw std::runtime_error("schemaLoader: unrecognized ref " + id);
 }
 
@@ -105,6 +109,32 @@ nlohmann::json diffPayload() {
     };
 }
 
+nlohmann::json telemetryPayload() {
+    return nlohmann::json{
+        {"spans",
+         nlohmann::json::array(
+             {nlohmann::json{
+                  {"spanId", 1},
+                  {"name", "parse"},
+                  {"startNanos", 0},
+                  {"endNanos", 1500},
+                  {"durationNanos", 1500},
+                  {"status", "ok"},
+              },
+              nlohmann::json{
+                  {"spanId", 2},
+                  {"parentSpanId", 1},
+                  {"name", "tokenize"},
+                  {"startNanos", 100},
+                  {"endNanos", 900},
+                  {"durationNanos", 800},
+                  {"status", "ok"},
+                  {"attributes",
+                   nlohmann::json{{"bytes", 9}, {"path", "a.arxml"}}},
+              }})},
+    };
+}
+
 nlohmann::json envelopeFor(const std::string& kind, nlohmann::json payload) {
     return nlohmann::json{
         {"$schema", "https://parsex.dev/schemas/v1/envelope.json"},
@@ -117,9 +147,10 @@ nlohmann::json envelopeFor(const std::string& kind, nlohmann::json payload) {
 
 }  // namespace
 
-TEST(PayloadSchemasTest, BothSchemasAreWellFormed) {
+TEST(PayloadSchemasTest, AllThreeSchemasAreWellFormed) {
     const fs::path dir = schemasDir();
-    for (const char* file : {"validation_result.schema.json", "diff_report.schema.json"}) {
+    for (const char* file :
+         {"validation_result.schema.json", "diff_report.schema.json", "telemetry_report.schema.json"}) {
         const fs::path path = dir / file;
         ASSERT_TRUE(fs::exists(path)) << path;
         nlohmann::json schema = nullptr;
@@ -138,6 +169,9 @@ TEST(PayloadSchemasTest, BothSchemasAreWellFormed) {
               "https://parsex.dev/schemas/v1/validation_result.json");
     const nlohmann::json diffSchema = loadJsonFile(dir / "diff_report.schema.json");
     EXPECT_EQ(diffSchema.at("$id").get<std::string>(), "https://parsex.dev/schemas/v1/diff_report.json");
+    const nlohmann::json telemetrySchema = loadJsonFile(dir / "telemetry_report.schema.json");
+    EXPECT_EQ(telemetrySchema.at("$id").get<std::string>(),
+              "https://parsex.dev/schemas/v1/telemetry_report.json");
 }
 
 TEST(PayloadSchemasTest, EnvelopeSelectsValidationResultSchema) {
@@ -153,6 +187,13 @@ TEST(PayloadSchemasTest, EnvelopeSelectsDiffReportSchema) {
     EXPECT_TRUE(validatesAgainst(envelopeSchema, doc)) << "kind=diffReport envelope must validate";
 }
 
+TEST(PayloadSchemasTest, EnvelopeSelectsTelemetryReportSchema) {
+    const nlohmann::json envelopeSchema = loadJsonFile(schemasDir() / "envelope.schema.json");
+    const nlohmann::json doc = envelopeFor("telemetryReport", telemetryPayload());
+    EXPECT_TRUE(validatesAgainst(envelopeSchema, doc))
+        << "kind=telemetryReport envelope must validate: " << doc.dump(2);
+}
+
 TEST(PayloadSchemasTest, CrossKindPayloadFailsConditional) {
     const nlohmann::json envelopeSchema = loadJsonFile(schemasDir() / "envelope.schema.json");
     // validationResult kind carrying a diff-shaped payload must NOT validate.
@@ -160,4 +201,10 @@ TEST(PayloadSchemasTest, CrossKindPayloadFailsConditional) {
     // diffReport kind carrying a validation-shaped payload must NOT validate.
     EXPECT_FALSE(
         validatesAgainst(envelopeSchema, envelopeFor("diffReport", validationPayload())));
+    // telemetryReport kind carrying a validation-shaped payload must NOT validate.
+    EXPECT_FALSE(
+        validatesAgainst(envelopeSchema, envelopeFor("telemetryReport", validationPayload())));
+    // validationResult kind carrying a telemetry-shaped payload must NOT validate.
+    EXPECT_FALSE(
+        validatesAgainst(envelopeSchema, envelopeFor("validationResult", telemetryPayload())));
 }

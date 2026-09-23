@@ -88,7 +88,7 @@ bool validatesAgainstSchema(const nlohmann::json& document,
         // ("validation_result.schema.json") and $id URLs
         // ("https://parsex.dev/schemas/v1/validation_result.json") resolve.
         for (const char* file : {"validation_result.schema.json", "diff_report.schema.json",
-                                 "envelope.schema.json",}) {
+                                 "telemetry_report.schema.json", "envelope.schema.json",}) {
             if (uriString.find(file) != std::string::npos) {
                 try {
                     value = loadJsonFile(baseDir / file, errorOut);

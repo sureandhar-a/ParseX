@@ -4,6 +4,8 @@
 #include <parsex/parser/model_builder.hpp>
 #include <parsex/parser/project_error.hpp>
 #include <parsex/parser/release_detector.hpp>
+#include <parsex/telemetry/scoped_span.hpp>
+#include <parsex/telemetry/scoped_span_macro.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -339,9 +341,18 @@ void resolveCrossFileReferences(ParsedProject& project) {
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static): stateless-by-design instance API — callers write Parser{}.parseFile(...).
 ParsedFile Parser::parseFile(const std::filesystem::path& path) const {
-    RawDocument document = loadRawDocument(path);
+    parsex::telemetry::ScopedSpan span("parser.parseFile");
+    span.setAttribute("path", path.string());
 
-    const std::optional<std::string> schemaFilename = detectSchemaFilename(document);
+    RawDocument document = [&] {
+        PARSEX_SPAN("parser.load");
+        return loadRawDocument(path);
+    }();
+
+    const std::optional<std::string> schemaFilename = [&] {
+        PARSEX_SPAN("parser.detectRelease");
+        return detectSchemaFilename(document);
+    }();
     if (!schemaFilename.has_value()) {
         throw std::runtime_error("parsex: cannot determine AUTOSAR release for '" +
                                  path.string() +
@@ -351,7 +362,11 @@ ParsedFile Parser::parseFile(const std::filesystem::path& path) const {
     ParsedFile file;
     file.autosarRelease = resolveRelease(schemaFilename.value());
     file.sourcePath = path;
-    buildSubtree(document.root, file);
+    {
+        PARSEX_SPAN("parser.buildModel");
+        buildSubtree(document.root, file);
+    }
+    span.setAttribute("release", file.autosarRelease);
     // Document move re-points parent links at the shared copy (see
     // RawDocument's move operations) — the Write Engine's spans stay valid.
     file.rawDocument = std::make_shared<RawDocument>(std::move(document));
@@ -360,6 +375,8 @@ ParsedFile Parser::parseFile(const std::filesystem::path& path) const {
 
 ParsedProject Parser::parseProject(const std::vector<std::filesystem::path>& entryPoints,
                                    FileDiscoveryMode mode) const {
+    parsex::telemetry::ScopedSpan span("parser.parseProject");
+    span.setAttribute("entryCount", static_cast<std::int64_t>(entryPoints.size()));
     if (mode == FileDiscoveryMode::LazyOnReference) {
         return parseProjectLazy(entryPoints);
     }

@@ -1,0 +1,63 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://parsex.dev/schemas/v1/telemetry_report.json",
+    "title": "ParseX telemetryReport Payload",
+    "description": "Kind-specific payload for kind=telemetryReport. Adapts OTLP's JSON span encoding to a single local process: flat span array (no resourceSpans/scopeSpans nesting), camelCase names per CONVENTIONS.md, per-run counter ids starting at 1 (well within the JSON safe-integer range). parentSpanId omitted for root spans (omit-over-null).",
+    "type": "object",
+    "properties": {
+        "spans": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/span"}
+        }
+    },
+    "required": ["spans"],
+    "additionalProperties": false,
+    "$defs": {
+        "span": {
+            "type": "object",
+            "properties": {
+                "spanId": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Per-run counter id (SpanId), serialized as a JSON number."
+                },
+                "parentSpanId": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Parent span id; omitted entirely for root spans."
+                },
+                "name": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "startNanos": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Nanoseconds since the process-local reference point."
+                },
+                "endNanos": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "durationNanos": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Derived endNanos - startNanos, included directly since most consumers want it."
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["unset", "ok", "error"]
+                },
+                "attributes": {
+                    "type": "object",
+                    "description": "String keys to string/number/boolean values (AttributeValue variant).",
+                    "additionalProperties": {
+                        "type": ["string", "integer", "number", "boolean"]
+                    }
+                }
+            },
+            "required": ["spanId", "name", "startNanos", "endNanos", "durationNanos", "status"],
+            "additionalProperties": false
+        }
+    }
+}

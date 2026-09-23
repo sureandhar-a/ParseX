@@ -22,11 +22,11 @@
         },
         "kind": {
             "type": "string",
-            "enum": ["validationResult", "diffReport"],
+            "enum": ["validationResult", "diffReport", "telemetryReport"],
             "description": "Discriminator for the kind-specific payload shape. Extensible in later minor versions."
         },
         "payload": {
-            "description": "Kind-specific body, constrained per-kind via the allOf conditional below (validationResult/diffReport payload schemas via $ref)."
+            "description": "Kind-specific body, constrained per-kind via the allOf conditional below (validationResult/diffReport/telemetryReport payload schemas via $ref)."
         }
     },
     "required": ["contractVersion", "toolVersion", "kind", "payload"],
@@ -39,6 +39,10 @@
         {
             "if": {"properties": {"kind": {"const": "diffReport"}}, "required": ["kind"]},
             "then": {"properties": {"payload": {"$ref": "diff_report.schema.json"}}}
+        },
+        {
+            "if": {"properties": {"kind": {"const": "telemetryReport"}}, "required": ["kind"]},
+            "then": {"properties": {"payload": {"$ref": "telemetry_report.schema.json"}}}
         }
     ]
 }
