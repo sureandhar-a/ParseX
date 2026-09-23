@@ -7,6 +7,10 @@ Trace& TelemetryContext::currentTrace() {
     return trace;
 }
 
+nlohmann::json TelemetryContext::currentTraceAsJson() {
+    return currentTrace().toJson();
+}
+
 void TelemetryContext::reset() {
     currentTrace().spans.clear();
 }
