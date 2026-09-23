@@ -1,5 +1,7 @@
 #include <parsex/write/write_engine.hpp>
 
+#include <parsex/telemetry/scoped_span.hpp>
+#include <parsex/telemetry/scoped_span_macro.hpp>
 #include <parsex/write/write_context.hpp>
 #include <parsex/write/write_elements.hpp>
 #include <parsex/write/write_format.hpp>
@@ -21,7 +23,13 @@ std::vector<T> sortedCopy(std::vector<T> items, KeyFn key) {
 
 void WriteEngine::write(const ParsedProject& project,
                         const std::filesystem::path& outputPath) const {
-    const ValidationResult problems = validate(project);
+    parsex::telemetry::ScopedSpan span("writeEngine.write");
+    span.setAttribute("outputPath", outputPath.string());
+    span.setAttribute("fileCount", static_cast<std::int64_t>(project.files.size()));
+    const ValidationResult problems = [&] {
+        PARSEX_SPAN("writeEngine.validate");
+        return validate(project);
+    }();
     if (problems.hasErrors()) {
         throw WriteError(problems);
     }
@@ -46,6 +54,8 @@ void WriteEngine::write(const ParsedProject& project,
     // Merge all files' domain objects (v1: single package "Sys"), emitting in
     // fixed type-group order with each group sorted by short-name
     // (semantically unordered per TPS_ASR_00014).
+    {
+        PARSEX_SPAN("writeEngine.buildTree");
     std::vector<Cluster> clusters;
     std::vector<EcuInstance> ecus;
     std::vector<Frame> frames;
@@ -88,10 +98,13 @@ void WriteEngine::write(const ParsedProject& project,
          })) {
         xmlAddChild(elements, buildSignalGroupElement(ctx.doc(), group));
     }
+    }  // writeEngine.buildTree
 
     assertNoWhitespaceOnlyTextNodes(ctx.root());
     // Temp path + rename into place (same convention as writeCacheAtomically):
     // a failed write() never leaves a partially-written file at outputPath.
+    {
+        PARSEX_SPAN("writeEngine.writeFile");
     const std::filesystem::path tempPath =
         std::filesystem::path(outputPath.string() + ".parsex-tmp");
     try {
@@ -107,6 +120,7 @@ void WriteEngine::write(const ParsedProject& project,
         std::filesystem::remove(tempPath, dropError);
         throw;
     }
+    }  // writeEngine.writeFile
 }
 
 WriteError::WriteError(ValidationResult errors)
