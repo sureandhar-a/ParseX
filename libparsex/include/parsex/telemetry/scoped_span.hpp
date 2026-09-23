@@ -36,8 +36,6 @@ public:
     ScopedSpan(ScopedSpan&&) = delete;
     ScopedSpan& operator=(ScopedSpan&&) = delete;
 
-    // Placeholder accessors for the next subtask (PAR-188), which adds the
-    // real setAttribute/setStatus plus parent-stack wiring refinements.
     void setAttribute(std::string key, AttributeValue value);
     void setStatus(SpanStatus status);
 

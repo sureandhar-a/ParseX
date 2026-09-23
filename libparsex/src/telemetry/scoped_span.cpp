@@ -1,6 +1,7 @@
 #include <parsex/telemetry/scoped_span.hpp>
 
 #include <chrono>
+#include <cassert>
 #include <cstdint>
 #include <exception>
 #include <string>
@@ -58,8 +59,14 @@ ScopedSpan::~ScopedSpan() {
     const TimePoint endPoint = Clock::now();
     const TimePoint origin = processStartTimePoint();
 
-    // Default-status logic lands in PAR-188; for now preserve whatever was
-    // set explicitly, otherwise leave Unset.
+    // Default status (PAR-188): explicit setStatus wins; otherwise Ok on clean
+    // exit, Error if an exception is unwinding through this scope (mirrors
+    // OpenTelemetry's Unset-resolves-to-success guidance).
+    SpanStatus finalStatus = status_;
+    if (!statusExplicit_) {
+        finalStatus = (std::uncaught_exceptions() > uncaughtAtConstruct_) ? SpanStatus::Error
+                                                                          : SpanStatus::Ok;
+    }
     Span finished;
     finished.name = name_;
     finished.id = id_;
@@ -67,20 +74,25 @@ ScopedSpan::~ScopedSpan() {
     finished.startNanos = nanosSince(startPoint_, origin);
     finished.endNanos = nanosSince(endPoint, origin);
     finished.attributes = std::move(attributes_);
-    finished.status = status_;
+    finished.status = finalStatus;
 
     auto& stack = activeSpanStack();
     if (!stack.empty() && stack.back() == id_) {
         stack.pop_back();
     } else {
-        // Out-of-order destruction hardening lands in PAR-188; for now pop by
-        // id match so a mis-scoped span cannot leak a stale parent.
+        // Out-of-order destruction: pop by id match so a mis-scoped span
+        // cannot leak a stale parent. Asserts in debug builds to catch caller
+        // bugs (e.g. a ScopedSpan stored past its natural scope) early.
+        bool found = false;
         for (auto it = stack.rbegin(); it != stack.rend(); ++it) {
             if (*it == id_) {
                 stack.erase(std::next(it).base());
+                found = true;
                 break;
             }
         }
+        assert(found && "ScopedSpan destroyed out of order or twice");
+        (void)found;
     }
 
     TelemetryContext::currentTrace().spans.push_back(std::move(finished));
