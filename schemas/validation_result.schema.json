@@ -1,0 +1,61 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://parsex.dev/schemas/v1/validation_result.json",
+    "title": "ParseX validationResult Payload",
+    "description": "Kind-specific payload for kind=validationResult. Formalizes the existing ValidationResult/ValidationError type (PAR-98): flat error list with severity, stable code, message, and optional location/context. Documentation/formalization only — not a redesign of that type.",
+    "type": "object",
+    "properties": {
+        "passed": {
+            "type": "boolean",
+            "description": "True when errors contains no Error-severity entries."
+        },
+        "errors": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "severity": {
+                        "type": "string",
+                        "enum": ["error", "warning"]
+                    },
+                    "code": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Stable check id, e.g. schema.invalid, ref.dangling, shortname.duplicate, can.dlc_mismatch, can.signal_overlap."
+                    },
+                    "message": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "location": {
+                        "type": "object",
+                        "properties": {
+                            "startOffset": {"type": "integer", "minimum": 0},
+                            "endOffset": {"type": "integer", "minimum": 0},
+                            "lineNumber": {"type": "integer", "minimum": 0}
+                        },
+                        "required": ["startOffset", "endOffset", "lineNumber"],
+                        "additionalProperties": false,
+                        "description": "Source span; omitted entirely when not attributable (omit-over-null per CONVENTIONS.md)."
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "REF path / parent path; omitted when the check does not set it."
+                    },
+                    "expectedType": {
+                        "type": "string",
+                        "description": "DEST expectation; omitted when the check does not set it."
+                    },
+                    "actualType": {
+                        "type": "string",
+                        "description": "Resolved tag / second signal; omitted when the check does not set it."
+                    }
+                },
+                "required": ["severity", "code", "message"],
+                "additionalProperties": false
+            }
+        }
+    },
+    "required": ["passed", "errors"],
+    "additionalProperties": false
+}

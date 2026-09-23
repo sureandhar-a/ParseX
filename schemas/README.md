@@ -5,8 +5,10 @@ Single source of truth for ParseX's JSON Output Contract (PAR-160).
 ## Files
 
 * `envelope.schema.json` — top-level envelope (`$schema`, `contractVersion`, `toolVersion`, `kind`, `payload`). Draft 2020-12.
-* `CONVENTIONS.md` — naming / null-handling / compatibility rules (PAR-162, forthcoming).
-* `VERSIONING.md` — `contractVersion` semver + breaking-change table (PAR-163, forthcoming).
+* `validation_result.schema.json` — `validationResult` payload (PAR-173).
+* `diff_report.schema.json` — `diffReport` payload (PAR-173).
+* `CONVENTIONS.md` — naming / null-handling / compatibility rules (PAR-162).
+* `VERSIONING.md` — `contractVersion` semver + breaking-change table (PAR-163).
 
 ## Design note: `additionalProperties: false` at the envelope level (PAR-166)
 

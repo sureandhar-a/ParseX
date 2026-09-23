@@ -1,0 +1,67 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://parsex.dev/schemas/v1/diff_report.json",
+    "title": "ParseX diffReport Payload",
+    "description": "Kind-specific payload for kind=diffReport. Formalizes the existing DiffReport/DiffEntry/FieldDiff types (PAR-121, PAR-127) plus diagnostics (PAR-125): entries with Added/Removed/Moved/Modified kinds and field-level diffs. Documentation/formalization only — not a redesign of those types. NOTE (discrepancy flagged for PAR-174): the JSON key inside fieldDiffs is 'field' while the C++ member is FieldDiff::fieldName; the schema documents the emitted JSON key ('field'), not the member name. NOTE 2: oldPath/newPath are optional in this schema (omit when absent per CONVENTIONS.md); pre-contract code emits empty strings instead — PAR-174 migrates the emitters to omit.",
+    "type": "object",
+    "properties": {
+        "entries": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": ["added", "removed", "moved", "modified"]
+                    },
+                    "elementType": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "e.g. Frame, Signal."
+                    },
+                    "oldPath": {
+                        "type": "string",
+                        "description": "Set for Removed, Moved, Modified; omitted when absent."
+                    },
+                    "newPath": {
+                        "type": "string",
+                        "description": "Set for Added, Moved, Modified; omitted when absent."
+                    },
+                    "fieldDiffs": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "field": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "Field name (C++ member FieldDiff::fieldName)."
+                                },
+                                "oldValue": {"type": "string"},
+                                "newValue": {"type": "string"}
+                            },
+                            "required": ["field", "oldValue", "newValue"],
+                            "additionalProperties": false
+                        }
+                    }
+                },
+                "required": ["kind", "elementType", "fieldDiffs"],
+                "additionalProperties": false
+            }
+        },
+        "diagnostics": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "minLength": 1},
+                    "elementType": {"type": "string", "minLength": 1}
+                },
+                "required": ["message", "elementType"],
+                "additionalProperties": false
+            }
+        }
+    },
+    "required": ["entries", "diagnostics"],
+    "additionalProperties": false
+}

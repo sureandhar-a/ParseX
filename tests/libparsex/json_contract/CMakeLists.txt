@@ -4,6 +4,7 @@ add_executable(json_contract_tests
     version_test.cpp
     versioning_test.cpp
     validator_smoke_test.cpp
+    payload_schemas_test.cpp
 )
 target_link_libraries(
     json_contract_tests
@@ -18,5 +19,6 @@ target_compile_definitions(
     PARSEX_ENVELOPE_SCHEMA_FILE="${CMAKE_SOURCE_DIR}/schemas/envelope.schema.json"
     PARSEX_CONVENTIONS_FILE="${CMAKE_SOURCE_DIR}/schemas/CONVENTIONS.md"
     PARSEX_VERSIONING_FILE="${CMAKE_SOURCE_DIR}/schemas/VERSIONING.md"
+    PARSEX_SCHEMAS_DIR="${CMAKE_SOURCE_DIR}/schemas"
 )
 gtest_discover_tests(json_contract_tests)

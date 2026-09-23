@@ -26,9 +26,19 @@
             "description": "Discriminator for the kind-specific payload shape. Extensible in later minor versions."
         },
         "payload": {
-            "description": "Kind-specific body. Left unconstrained (true) at the envelope level; tightened per-kind via $ref once validationResult/diffReport payload schemas land (PAR-164)."
+            "description": "Kind-specific body, constrained per-kind via the allOf conditional below (validationResult/diffReport payload schemas via $ref)."
         }
     },
     "required": ["contractVersion", "toolVersion", "kind", "payload"],
-    "additionalProperties": false
+    "additionalProperties": false,
+    "allOf": [
+        {
+            "if": {"properties": {"kind": {"const": "validationResult"}}, "required": ["kind"]},
+            "then": {"properties": {"payload": {"$ref": "validation_result.schema.json"}}}
+        },
+        {
+            "if": {"properties": {"kind": {"const": "diffReport"}}, "required": ["kind"]},
+            "then": {"properties": {"payload": {"$ref": "diff_report.schema.json"}}}
+        }
+    ]
 }
