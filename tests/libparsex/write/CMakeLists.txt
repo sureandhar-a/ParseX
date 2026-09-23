@@ -1,0 +1,27 @@
+add_executable(write_tests
+    tree_construction_test.cpp
+    ordering_test.cpp
+    determinism_test.cpp
+    whitespace_guard_test.cpp
+    file_output_test.cpp
+    pretty_print_test.cpp
+    roundtrip_test.cpp
+    fixture_sweep_test.cpp
+    limitation_test.cpp
+    facade_test.cpp
+    error_handling_test.cpp
+    write_e2e_test.cpp
+)
+target_compile_definitions(
+    write_tests
+    PRIVATE
+    PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+)
+target_link_libraries(
+    write_tests
+    PRIVATE
+    libparsex
+    GTest::gtest
+    GTest::gtest_main
+)
+gtest_discover_tests(write_tests)
