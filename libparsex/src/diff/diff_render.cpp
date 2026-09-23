@@ -4,8 +4,7 @@
 #include <sstream>
 #include <string>
 
-#include <parsex/json_contract/version.hpp>
-#include <parsex/version.hpp>
+#include <parsex/json_contract/envelope.hpp>
 
 // Human-readable text rendering (PAR-132).
 // Groups entries into Added/Removed/Moved/Modified sections in fixed order,
@@ -149,15 +148,8 @@ nlohmann::json DiffReport::toJson() const {
         diagJson["message"] = diag.message;
         payload["diagnostics"].push_back(std::move(diagJson));
     }
-    // Envelope per schemas/envelope.schema.json. (PAR-176 replaces this
-    // inline construction with the shared wrapEnvelope() helper.)
-    nlohmann::json envelope;
-    envelope["$schema"] = "https://parsex.dev/schemas/v1/envelope.json";
-    envelope["contractVersion"] = std::string(parsex::json_contract::kContractVersion);
-    envelope["toolVersion"] = std::string(libparsexVersion());
-    envelope["kind"] = "diffReport";
-    envelope["payload"] = std::move(payload);
-    return envelope;
+    // Envelope via the shared helper (PAR-176): single construction site.
+    return parsex::json_contract::wrapEnvelope("diffReport", std::move(payload));
 }
 
 DiffReport DiffReport::fromJson(const nlohmann::json& jsonDoc) {

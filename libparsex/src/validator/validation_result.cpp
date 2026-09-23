@@ -2,8 +2,7 @@
 
 #include <algorithm>
 
-#include <parsex/json_contract/version.hpp>
-#include <parsex/version.hpp>
+#include <parsex/json_contract/envelope.hpp>
 
 bool ValidationResult::hasErrors() const noexcept {
     return std::ranges::any_of(
@@ -83,15 +82,7 @@ nlohmann::json ValidationResult::toJson() const {
     for (const auto& err : errors) {
         payload["errors"].push_back(errorToJson(err));
     }
-    // Envelope per schemas/envelope.schema.json. (PAR-176 replaces this
-    // inline construction with the shared wrapEnvelope() helper.)
-    nlohmann::json envelope;
-    envelope["$schema"] = "https://parsex.dev/schemas/v1/envelope.json";
-    envelope["contractVersion"] = std::string(parsex::json_contract::kContractVersion);
-    envelope["toolVersion"] = std::string(libparsexVersion());
-    envelope["kind"] = "validationResult";
-    envelope["payload"] = std::move(payload);
-    return envelope;
+    return parsex::json_contract::wrapEnvelope("validationResult", std::move(payload));
 }
 
 ValidationResult ValidationResult::fromJson(const nlohmann::json& jsonDoc) {
