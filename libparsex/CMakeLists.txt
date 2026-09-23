@@ -14,6 +14,9 @@ add_library(libparsex STATIC
     src/telemetry/span_status.cpp
     src/telemetry/span_id.cpp
     src/telemetry/trace.cpp
+    src/telemetry/telemetry_config.cpp
+    src/telemetry/telemetry_context.cpp
+    src/telemetry/scoped_span.cpp
     src/diff/diff_report.cpp
     src/diff/diff_match.cpp
     src/diff/diff_moves.cpp
