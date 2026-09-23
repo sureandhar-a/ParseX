@@ -15,6 +15,18 @@ int main(int argc, char const *argv[])
     // TODO(PAR-207): document --version in docs/cli.md
     app.set_version_flag("--version,-V", std::string(libparsexVersion()));
 
+    // Shared top-level options readable from every subcommand callback.
+    // PAR-206 branches on jsonOutput without re-parsing.
+    struct CliOptions {
+        bool jsonOutput{false};
+    };
+    CliOptions opts;
+    app.add_flag("--json", opts.jsonOutput, "Emit machine-readable JSON instead of human-readable text");
+    // NOTE (PAR-212): CLI11 resolves `--json` before the subcommand
+    // (`parsex --json parse ...`). `parsex parse --json ...` is rejected
+    // unless each subcommand re-declares the flag or fallthrough is enabled;
+    // single top-level flag kept intentionally, documented here.
+
     auto* parseCmd = app.add_subcommand("parse", "Parse an ARXML file and report its structure");
     auto* validateCmd = app.add_subcommand("validate", "Validate an ARXML file against ParseX rules");
     auto* diffCmd = app.add_subcommand("diff", "Diff two ARXML files");
@@ -34,6 +46,23 @@ int main(int argc, char const *argv[])
     writeCmd->add_option("--input,-i", writeInput, "Input ARXML file")->required()->check(CLI::ExistingFile);
     diffCmd->add_option("--base", diffBase, "Base ARXML file")->required()->check(CLI::ExistingFile);
     diffCmd->add_option("--target", diffTarget, "Target ARXML file")->required()->check(CLI::ExistingFile);
+    parseCmd->callback([&]() {
+        (void)opts.jsonOutput;
+        (void)parseInput;
+    });
+    validateCmd->callback([&]() {
+        (void)opts.jsonOutput;
+        (void)validateInput;
+    });
+    diffCmd->callback([&]() {
+        (void)opts.jsonOutput;
+        (void)diffBase;
+        (void)diffTarget;
+    });
+    writeCmd->callback([&]() {
+        (void)opts.jsonOutput;
+        (void)writeInput;
+    });
     (void)parseCmd;
     (void)validateCmd;
     (void)diffCmd;
