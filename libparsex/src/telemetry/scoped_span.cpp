@@ -49,6 +49,12 @@ ScopedSpan::ScopedSpan(std::string_view name) {
     if (!stack.empty()) {
         parentId_ = stack.back();
     }
+    // Force origin initialization BEFORE capturing start: steady_clock has no
+    // epoch, so startNanos is (start - origin). If origin were lazily
+    // initialized in the destructor instead, the first span's start would
+    // predate the origin and wrap to a huge uint64 (caught by ASan-run schema
+    // validation in PAR-200).
+    (void)processStartTimePoint();
     startPoint_ = Clock::now();
     uncaughtAtConstruct_ = std::uncaught_exceptions();
     stack.push_back(id_);
