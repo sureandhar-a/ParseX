@@ -117,7 +117,7 @@ xmlNodePtr buildFrameElement(xmlDocPtr doc, const Frame& value) {
         xmlNodePtr mappings = appendChild(node, "PDU-TO-FRAME-MAPPINGS");
         const std::vector<FramePduMapping> sorted = sortedFramePduMappings(value.pdus);
         for (std::size_t idx = 0; idx < sorted.size(); ++idx) {
-            const FramePduMapping& mapping = sorted[idx];
+            const FramePduMapping& mapping = sorted.at(idx);
             xmlNodePtr entry = appendChild(mappings, "PDU-TO-FRAME-MAPPING");
             // Mappings carry their own SHORT-NAME in real files; synthesize
             // deterministically (owner + target, or owner + index when the
@@ -154,7 +154,7 @@ xmlNodePtr buildPduElement(xmlDocPtr doc, const Pdu& value) {
         const std::vector<PduSignalMapping> sorted =
             sortedPduSignalMappings(value.signalMappings);
         for (std::size_t idx = 0; idx < sorted.size(); ++idx) {
-            const PduSignalMapping& mapping = sorted[idx];
+            const PduSignalMapping& mapping = sorted.at(idx);
             xmlNodePtr entry = appendChild(mappings, "I-SIGNAL-TO-I-PDU-MAPPING");
             appendTextChild(entry, "SHORT-NAME",
                             mapping.signalShortNameRef.empty()

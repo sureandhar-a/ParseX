@@ -18,7 +18,7 @@
 // r<major>.<minor> derived from the release string (R21-11 -> r21.11).
 struct WriteContext {
     // Direct construction with explicit URIs (tests use this).
-    WriteContext(const std::string& namespaceUri, const std::string& schemaLocation);
+    WriteContext(std::string namespaceUri, std::string schemaLocation);
 
     WriteContext(const WriteContext&) = delete;
     WriteContext& operator=(const WriteContext&) = delete;

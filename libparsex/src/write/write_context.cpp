@@ -2,10 +2,11 @@
 
 #include <cstdlib>
 #include <libxml/xmlstring.h>
+#include <utility>
 
 namespace {
 
-std::string defaultSchemaFilename() {
+const char* defaultSchemaFilename() {
     // Matches tests/fixtures/parsefile_complete.arxml and system-4.2.arxml:
     // r4.0 namespace with the 4.4.0 distribution file.
     return "AUTOSAR_00046.xsd";
@@ -13,11 +14,14 @@ std::string defaultSchemaFilename() {
 
 }  // namespace
 
-WriteContext::WriteContext(const std::string& namespaceUri,
-                           const std::string& schemaLocation)
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the namespace URI and
+// schema-location value are a documented pair, always built together via
+// forRelease()/schemaLocationForRelease(); call sites pass distinctly-named
+// locals, never two bare literals.
+WriteContext::WriteContext(std::string namespaceUri, std::string schemaLocation)
     : doc_(XmlDocPtr(xmlNewDoc(BAD_CAST "1.0"))),
-      namespaceUri_(namespaceUri),
-      schemaLocation_(schemaLocation) {
+      namespaceUri_(std::move(namespaceUri)),
+      schemaLocation_(std::move(schemaLocation)) {
     if (doc_ == nullptr) {
         throw std::runtime_error("parsex: cannot create XML document for WriteContext");
     }
@@ -50,8 +54,8 @@ WriteContext::WriteContext(const std::string& namespaceUri,
 }
 
 WriteContext WriteContext::forRelease(const std::string& autosarRelease) {
-    const std::string ns = namespaceUriForRelease(autosarRelease);
-    return WriteContext(ns, ns + " " + schemaFilenameForRelease(autosarRelease));
+    const std::string uri = namespaceUriForRelease(autosarRelease);
+    return {uri, uri + " " + schemaFilenameForRelease(autosarRelease)};
 }
 
 std::string WriteContext::dumpToString() const {
@@ -61,7 +65,10 @@ std::string WriteContext::dumpToString() const {
     if (buffer == nullptr) {
         return "";
     }
-    std::string out(reinterpret_cast<const char*>(buffer), static_cast<std::size_t>(size));
+    std::string out(
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): xmlChar is libxml2's unsigned-char string type.
+        reinterpret_cast<const char*>(buffer),
+        static_cast<std::size_t>(size));
     xmlFree(buffer);
     return out;
 }
@@ -79,7 +86,7 @@ std::string WriteContext::namespaceUriForRelease(const std::string& autosarRelea
         }
         return "http://autosar.org/schema/r" + rest;
     }
-    if (autosarRelease.rfind("4.", 0) == 0) {
+    if (autosarRelease.starts_with("4.")) {
         return "http://autosar.org/schema/r4.0";
     }
     // Fallback: dotted release -> r<major>.<minor> (e.g. "4.0" -> r4.0).
@@ -123,6 +130,6 @@ std::string WriteContext::schemaFilenameForRelease(const std::string& autosarRel
 }
 
 std::string WriteContext::schemaLocationForRelease(const std::string& autosarRelease) {
-    const std::string ns = namespaceUriForRelease(autosarRelease);
-    return ns + " " + schemaFilenameForRelease(autosarRelease);
+    const std::string uri = namespaceUriForRelease(autosarRelease);
+    return uri + " " + schemaFilenameForRelease(autosarRelease);
 }

@@ -10,6 +10,7 @@ bool isWhitespaceOnly(const xmlChar* content) {
     if (content == nullptr) {
         return false;
     }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): null-terminated xmlChar walk mandated by libxml2's string type.
     for (const xmlChar* ptr = content; *ptr != '\0'; ++ptr) {
         if (*ptr != ' ' && *ptr != '\t' && *ptr != '\r' && *ptr != '\n') {
             return false;

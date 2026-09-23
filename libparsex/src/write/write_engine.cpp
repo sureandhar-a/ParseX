@@ -60,31 +60,33 @@ void WriteEngine::write(const ParsedProject& project,
         signals.insert(signals.end(), file.signals.begin(), file.signals.end());
         groups.insert(groups.end(), file.signalGroups.begin(), file.signalGroups.end());
     }
-    for (const Cluster& c :
-         sortedCopy(std::move(clusters), [](const Cluster& v) { return v.common.shortName; })) {
-        xmlAddChild(elements, buildClusterElement(ctx.doc(), c));
-    }
-    for (const EcuInstance& e : sortedCopy(std::move(ecus), [](const EcuInstance& v) {
-             return v.common.shortName;
+    for (const Cluster& cluster : sortedCopy(std::move(clusters), [](const Cluster& value) {
+             return value.common.shortName;
          })) {
-        xmlAddChild(elements, buildEcuInstanceElement(ctx.doc(), e));
+        xmlAddChild(elements, buildClusterElement(ctx.doc(), cluster));
     }
-    for (const Frame& f :
-         sortedCopy(std::move(frames), [](const Frame& v) { return v.common.shortName; })) {
-        xmlAddChild(elements, buildFrameElement(ctx.doc(), f));
-    }
-    for (const Pdu& p :
-         sortedCopy(std::move(pdus), [](const Pdu& v) { return v.common.shortName; })) {
-        xmlAddChild(elements, buildPduElement(ctx.doc(), p));
-    }
-    for (const Signal& s :
-         sortedCopy(std::move(signals), [](const Signal& v) { return v.common.shortName; })) {
-        xmlAddChild(elements, buildSignalElement(ctx.doc(), s));
-    }
-    for (const SignalGroup& g : sortedCopy(std::move(groups), [](const SignalGroup& v) {
-             return v.common.shortName;
+    for (const EcuInstance& ecu : sortedCopy(std::move(ecus), [](const EcuInstance& value) {
+             return value.common.shortName;
          })) {
-        xmlAddChild(elements, buildSignalGroupElement(ctx.doc(), g));
+        xmlAddChild(elements, buildEcuInstanceElement(ctx.doc(), ecu));
+    }
+    for (const Frame& frame :
+         sortedCopy(std::move(frames), [](const Frame& value) { return value.common.shortName; })) {
+        xmlAddChild(elements, buildFrameElement(ctx.doc(), frame));
+    }
+    for (const Pdu& pdu :
+         sortedCopy(std::move(pdus), [](const Pdu& value) { return value.common.shortName; })) {
+        xmlAddChild(elements, buildPduElement(ctx.doc(), pdu));
+    }
+    for (const Signal& signal : sortedCopy(std::move(signals), [](const Signal& value) {
+             return value.common.shortName;
+         })) {
+        xmlAddChild(elements, buildSignalElement(ctx.doc(), signal));
+    }
+    for (const SignalGroup& group : sortedCopy(std::move(groups), [](const SignalGroup& value) {
+             return value.common.shortName;
+         })) {
+        xmlAddChild(elements, buildSignalGroupElement(ctx.doc(), group));
     }
 
     assertNoWhitespaceOnlyTextNodes(ctx.root());
@@ -122,6 +124,7 @@ namespace {
 void checkShortNames(const std::string& type,
                      const std::vector<std::string>& shortNames, std::size_t fileIndex,
                      ValidationResult& out) {
+    out.errors.reserve(out.errors.size() + shortNames.size());
     for (std::size_t idx = 0; idx < shortNames.size(); ++idx) {
         if (!shortNames.at(idx).empty()) {
             continue;
@@ -138,12 +141,14 @@ void checkShortNames(const std::string& type,
 
 }  // namespace
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): stateless-by-design instance API — callers write WriteEngine{}.validate(...).
 ValidationResult WriteEngine::validate(const ParsedProject& project) const {
     ValidationResult result;
     for (std::size_t fileIdx = 0; fileIdx < project.files.size(); ++fileIdx) {
-        const ParsedFile& file = project.files[fileIdx];
+        const ParsedFile& file = project.files.at(fileIdx);
         const auto names = [](const auto& items) {
             std::vector<std::string> out;
+            out.reserve(items.size());
             for (const auto& item : items) {
                 out.push_back(item.common.shortName);
             }
