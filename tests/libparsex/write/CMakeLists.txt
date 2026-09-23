@@ -4,6 +4,7 @@ add_executable(write_tests
     determinism_test.cpp
     whitespace_guard_test.cpp
     file_output_test.cpp
+    pretty_print_test.cpp
 )
 target_link_libraries(
     write_tests
