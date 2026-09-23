@@ -6,6 +6,10 @@
 #include <string>
 #include <vector>
 
+#include <parsex/model/frame.hpp>
+#include <parsex/model/pdu.hpp>
+#include <parsex/model/signal.hpp>
+
 // Deterministic ordering passes (PAR-148/149), per AUTOSAR ARXML
 // Serialization Rules R20-11.
 //
@@ -28,4 +32,31 @@ void setSortedAttributes(
 template <typename T, typename KeyFn>
 void sortByKey(std::vector<T>& items, KeyFn key) {
     std::ranges::sort(items, {}, key);
+}
+
+// Classification (per Common Domain-Model field semantics):
+// - UNORDERED (sorted by short-name/stable key): Cluster.physicalChannels,
+//   EcuInstance.connectedChannels/controllers, Frame.transmitters,
+//   Frame.pdus (by pduShortNameRef — START-POSITION is an attribute, list
+//   order itself carries no meaning), Pdu.signalMappings (by
+//   signalShortNameRef), Signal.receivers, SignalGroup.members,
+//   Signal.valueTable (by numeric code), and every top-level domain vector
+//   (clusters, ecuInstances, frames, pdus, signals, signalGroups by
+//   common.shortName).
+// - ORDERED (never resorted, preserved exactly): no v1 domain
+//   repeated-element collection. The ordered branch exists for future AUTOSAR
+//   sequences with meaningful position (preserveElementOrder documents and
+//   tests it) — today every repeated structure above is unordered.
+std::vector<std::string> sortedStrings(std::vector<std::string> names);
+std::vector<FramePduMapping> sortedFramePduMappings(std::vector<FramePduMapping> mappings);
+std::vector<PduSignalMapping> sortedPduSignalMappings(
+    std::vector<PduSignalMapping> mappings);
+std::vector<ValueTableEntry> sortedValueTableEntries(std::vector<ValueTableEntry> entries);
+
+// Ordered-branch helper: returns the input unchanged. Used (today only in
+// tests) to prove the classification actually branches instead of sorting
+// everything unconditionally.
+template <typename T>
+std::vector<T> preserveElementOrder(std::vector<T> items) {
+    return items;
 }

@@ -43,7 +43,7 @@ xmlNodePtr buildClusterElement(xmlDocPtr doc, const Cluster& value) {
     }
     if (!value.physicalChannels.empty()) {
         xmlNodePtr channels = appendChild(node, "PHYSICAL-CHANNELS");
-        for (const std::string& channel : value.physicalChannels) {
+        for (const std::string& channel : sortedStrings(value.physicalChannels)) {
             xmlNodePtr entry = appendChild(channels, "PHYSICAL-CHANNEL");
             appendTextChild(entry, "SHORT-NAME", channel);
         }
@@ -58,7 +58,7 @@ xmlNodePtr buildEcuInstanceElement(xmlDocPtr doc, const EcuInstance& value) {
     appendOptionalTextChild(node, "CATEGORY", value.common.category);
     if (!value.connectedChannels.empty()) {
         xmlNodePtr channels = appendChild(node, "CONNECTED-CHANNELS");
-        for (const std::string& channel : value.connectedChannels) {
+        for (const std::string& channel : sortedStrings(value.connectedChannels)) {
             xmlNodePtr ref = appendChild(channels, "CHANNEL-REF");
             setSortedAttributes(ref, {{"DEST", "PHYSICAL-CHANNEL"}});
             setNodeText(ref, "/Sys/" + channel);
@@ -66,7 +66,7 @@ xmlNodePtr buildEcuInstanceElement(xmlDocPtr doc, const EcuInstance& value) {
     }
     if (!value.controllers.empty()) {
         xmlNodePtr controllers = appendChild(node, "CONTROLLERS");
-        for (const std::string& controller : value.controllers) {
+        for (const std::string& controller : sortedStrings(value.controllers)) {
             xmlNodePtr entry = appendChild(controllers, "CAN-CONTROLLER");
             appendTextChild(entry, "SHORT-NAME", controller);
         }
@@ -83,7 +83,7 @@ xmlNodePtr buildFrameElement(xmlDocPtr doc, const Frame& value) {
     appendTextChild(node, "LENGTH", std::to_string(value.length));
     if (!value.transmitters.empty()) {
         xmlNodePtr transmitters = appendChild(node, "TRANSMITTERS");
-        for (const std::string& ecu : value.transmitters) {
+        for (const std::string& ecu : sortedStrings(value.transmitters)) {
             xmlNodePtr ref = appendChild(transmitters, "TRANSMITTER-REF");
             setSortedAttributes(ref, {{"DEST", "ECU-INSTANCE"}});
             setNodeText(ref, "/Sys/" + ecu);
@@ -91,7 +91,7 @@ xmlNodePtr buildFrameElement(xmlDocPtr doc, const Frame& value) {
     }
     if (!value.pdus.empty()) {
         xmlNodePtr pdus = appendChild(node, "PDUS");
-        for (const FramePduMapping& mapping : value.pdus) {
+        for (const FramePduMapping& mapping : sortedFramePduMappings(value.pdus)) {
             xmlNodePtr entry = appendChild(pdus, "FRAME-PDU");
             // FRAME-PDU carries its own SHORT-NAME in real files; synthesize
             // deterministically (owner + target) — the Parser only reads
@@ -115,7 +115,7 @@ xmlNodePtr buildPduElement(xmlDocPtr doc, const Pdu& value) {
     appendTextChild(node, "LENGTH", std::to_string(value.length));
     if (!value.signalMappings.empty()) {
         xmlNodePtr mappings = appendChild(node, "SIGNAL-MAPPINGS");
-        for (const PduSignalMapping& mapping : value.signalMappings) {
+        for (const PduSignalMapping& mapping : sortedPduSignalMappings(value.signalMappings)) {
             xmlNodePtr entry = appendChild(mappings, "PDU-SIGNAL-MAPPING");
             appendTextChild(entry, "SHORT-NAME",
                             value.common.shortName + "_" + mapping.signalShortNameRef);
@@ -139,7 +139,7 @@ xmlNodePtr buildSignalElement(xmlDocPtr doc, const Signal& value) {
     appendTextChild(node, "BYTE-ORDER", byteOrderToString(value.byteOrder));
     if (value.valueTable.has_value()) {
         xmlNodePtr table = appendChild(node, "VALUE-TABLE");
-        for (const ValueTableEntry& entry : value.valueTable.value()) {
+        for (const ValueTableEntry& entry : sortedValueTableEntries(value.valueTable.value())) {
             xmlNodePtr item = appendChild(table, "VALUE-TABLE-ENTRY");
             appendTextChild(item, "VALUE", std::to_string(entry.value));
             appendTextChild(item, "LABEL", entry.label);
@@ -147,7 +147,7 @@ xmlNodePtr buildSignalElement(xmlDocPtr doc, const Signal& value) {
     }
     if (!value.receivers.empty()) {
         xmlNodePtr receivers = appendChild(node, "RECEIVERS");
-        for (const std::string& ecu : value.receivers) {
+        for (const std::string& ecu : sortedStrings(value.receivers)) {
             xmlNodePtr ref = appendChild(receivers, "RECEIVER-REF");
             setSortedAttributes(ref, {{"DEST", "ECU-INSTANCE"}});
             setNodeText(ref, "/Sys/" + ecu);
@@ -162,7 +162,7 @@ xmlNodePtr buildSignalGroupElement(xmlDocPtr doc, const SignalGroup& value) {
     appendTextChild(node, "SHORT-NAME", value.common.shortName);
     if (!value.members.empty()) {
         xmlNodePtr members = appendChild(node, "MEMBERS");
-        for (const std::string& member : value.members) {
+        for (const std::string& member : sortedStrings(value.members)) {
             // Reference encoding matches the Parser's REF resolution (PAR-94):
             // DEST-typed ref whose text reduces to the short name after the
             // last '/' — reuse exactly, never a new convention.
