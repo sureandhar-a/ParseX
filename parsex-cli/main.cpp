@@ -19,6 +19,21 @@ int main(int argc, char const *argv[])
     auto* validateCmd = app.add_subcommand("validate", "Validate an ARXML file against ParseX rules");
     auto* diffCmd = app.add_subcommand("diff", "Diff two ARXML files");
     auto* writeCmd = app.add_subcommand("write", "Apply a safe edit to an ARXML file");
+
+    // Shared input-path options with CLI11 built-in existence validation.
+    // Bad paths fail fast at parse time before any engine code runs. Error
+    // text from CLI11 already names the flag and the bad value; any further
+    // clig.dev tone polish belongs to PAR-204, not here.
+    std::string parseInput;
+    std::string validateInput;
+    std::string writeInput;
+    std::string diffBase;
+    std::string diffTarget;
+    parseCmd->add_option("--input,-i", parseInput, "Input ARXML file")->required()->check(CLI::ExistingFile);
+    validateCmd->add_option("--input,-i", validateInput, "Input ARXML file")->required()->check(CLI::ExistingFile);
+    writeCmd->add_option("--input,-i", writeInput, "Input ARXML file")->required()->check(CLI::ExistingFile);
+    diffCmd->add_option("--base", diffBase, "Base ARXML file")->required()->check(CLI::ExistingFile);
+    diffCmd->add_option("--target", diffTarget, "Target ARXML file")->required()->check(CLI::ExistingFile);
     (void)parseCmd;
     (void)validateCmd;
     (void)diffCmd;
