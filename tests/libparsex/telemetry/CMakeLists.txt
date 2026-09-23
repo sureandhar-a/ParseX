@@ -1,0 +1,11 @@
+add_executable(telemetry_tests
+    telemetry_data_model_test.cpp
+)
+target_link_libraries(
+    telemetry_tests
+    PRIVATE
+    libparsex
+    GTest::gtest
+    GTest::gtest_main
+)
+gtest_discover_tests(telemetry_tests)
