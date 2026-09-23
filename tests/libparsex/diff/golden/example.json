@@ -1,72 +1,72 @@
 {
-  "diagnostics": [
-    {
-      "elementType": "Frame",
-      "message": "4 candidates shared secondary key len:16|tx:|pdu: for type Frame, no move inferred (removed:/AMB1, removed:/AMB2, added:/AMB3, added:/AMB4)"
-    }
-  ],
-  "entries": [
-    {
-      "elementType": "Frame",
-      "fieldDiffs": [],
-      "kind": "removed",
-      "newPath": "",
-      "oldPath": "/AMB1"
-    },
-    {
-      "elementType": "Frame",
-      "fieldDiffs": [],
-      "kind": "removed",
-      "newPath": "",
-      "oldPath": "/AMB2"
-    },
-    {
-      "elementType": "Frame",
-      "fieldDiffs": [],
-      "kind": "added",
-      "newPath": "/AMB3",
-      "oldPath": ""
-    },
-    {
-      "elementType": "Frame",
-      "fieldDiffs": [],
-      "kind": "added",
-      "newPath": "/AMB4",
-      "oldPath": ""
-    },
-    {
-      "elementType": "Frame",
-      "fieldDiffs": [],
-      "kind": "moved",
-      "newPath": "/FMoveNew",
-      "oldPath": "/FMoveOld"
-    },
-    {
-      "elementType": "Frame",
-      "fieldDiffs": [],
-      "kind": "added",
-      "newPath": "/FNew",
-      "oldPath": ""
-    },
-    {
-      "elementType": "Frame",
-      "fieldDiffs": [],
-      "kind": "removed",
-      "newPath": "",
-      "oldPath": "/FOld"
-    },
-    {
-      "elementType": "Signal",
-      "fieldDiffs": [
-        {
-          "field": "startBit",
-          "newValue": "7",
-          "oldValue": "3"
-        }
-      ],
-      "kind": "modified",
-      "newPath": "/SMod",
-      "oldPath": "/SMod"
-    }
-  ]
+  "$schema": "https://parsex.dev/schemas/v1/envelope.json",
+  "contractVersion": "1.0.0",
+  "kind": "diffReport",
+  "payload": {
+    "diagnostics": [
+      {
+        "elementType": "Frame",
+        "message": "4 candidates shared secondary key len:16|tx:|pdu: for type Frame, no move inferred (removed:/AMB1, removed:/AMB2, added:/AMB3, added:/AMB4)"
+      }
+    ],
+    "entries": [
+      {
+        "elementType": "Frame",
+        "fieldDiffs": [],
+        "kind": "removed",
+        "oldPath": "/AMB1"
+      },
+      {
+        "elementType": "Frame",
+        "fieldDiffs": [],
+        "kind": "removed",
+        "oldPath": "/AMB2"
+      },
+      {
+        "elementType": "Frame",
+        "fieldDiffs": [],
+        "kind": "added",
+        "newPath": "/AMB3"
+      },
+      {
+        "elementType": "Frame",
+        "fieldDiffs": [],
+        "kind": "added",
+        "newPath": "/AMB4"
+      },
+      {
+        "elementType": "Frame",
+        "fieldDiffs": [],
+        "kind": "moved",
+        "newPath": "/FMoveNew",
+        "oldPath": "/FMoveOld"
+      },
+      {
+        "elementType": "Frame",
+        "fieldDiffs": [],
+        "kind": "added",
+        "newPath": "/FNew"
+      },
+      {
+        "elementType": "Frame",
+        "fieldDiffs": [],
+        "kind": "removed",
+        "oldPath": "/FOld"
+      },
+      {
+        "elementType": "Signal",
+        "fieldDiffs": [
+          {
+            "field": "startBit",
+            "newValue": "7",
+            "oldValue": "3"
+          }
+        ],
+        "kind": "modified",
+        "newPath": "/SMod",
+        "oldPath": "/SMod"
+      }
+    ]
+  },
+  "toolVersion": "1.0.0"
 }

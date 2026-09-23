@@ -26,7 +26,7 @@ TEST(DiffEngineTest, PlainMoveYieldsOneMovedWithEmptyDiffs) {
     EXPECT_EQ(report.entries[0].kind, DiffKind::Moved);
     EXPECT_TRUE(report.entries[0].fieldDiffs.empty());
     EXPECT_NE(report.toText().find("Moved:"), std::string::npos);
-    EXPECT_EQ(report.toJson()["entries"][0]["kind"], "moved");
+    EXPECT_EQ(report.toJson()["payload"]["entries"][0]["kind"], "moved");
 }
 
 TEST(DiffEngineTest, MovedAndChangedIsSingleMovedEntryWithDiffs) {
@@ -65,5 +65,5 @@ TEST(DiffEngineTest, MovedAndChangedIsSingleMovedEntryWithDiffs) {
     EXPECT_TRUE(sawFactor);
     // Spot-check renderers handle the non-empty-diff Moved entry.
     EXPECT_NE(report.toText().find("factor: 1 -> 2"), std::string::npos);
-    EXPECT_EQ(report.toJson()["entries"][0]["kind"], "moved");
+    EXPECT_EQ(report.toJson()["payload"]["entries"][0]["kind"], "moved");
 }

@@ -1,7 +1,9 @@
-// Unit tests for structured JSON renderer (PAR-133).
+// Unit tests for structured JSON renderer (PAR-133, envelope-migrated PAR-174).
 #include <gtest/gtest.h>
 
 #include <parsex/diff/diff_report.hpp>
+#include <parsex/json_contract/version.hpp>
+#include <parsex/version.hpp>
 
 namespace {
 
@@ -28,18 +30,30 @@ DiffReport sampleReport() {
 TEST(DiffJsonTest, ShapeHasExpectedKeysAndValues) {
     const nlohmann::json j = sampleReport().toJson();
 
-    ASSERT_TRUE(j.contains("entries"));
-    ASSERT_TRUE(j.contains("diagnostics"));
-    ASSERT_EQ(j["entries"].size(), 4U);
+    // Envelope (PAR-174).
+    EXPECT_EQ(j["kind"], "diffReport");
+    EXPECT_EQ(j["contractVersion"], std::string(parsex::json_contract::kContractVersion));
+    EXPECT_EQ(j["toolVersion"], std::string(libparsexVersion()));
+    ASSERT_TRUE(j.contains("payload"));
 
-    const nlohmann::json added = j["entries"][0];
+    const nlohmann::json& payload = j["payload"];
+    ASSERT_TRUE(payload.contains("entries"));
+    ASSERT_TRUE(payload.contains("diagnostics"));
+    ASSERT_EQ(payload["entries"].size(), 4U);
+
+    const nlohmann::json added = payload["entries"][0];
     EXPECT_EQ(added["kind"], "added");
     EXPECT_EQ(added["elementType"], "Frame");
-    EXPECT_EQ(added["oldPath"], "");
+    // Omit-optional (PAR-174): absent Added.oldPath is omitted, not "".
+    EXPECT_FALSE(added.contains("oldPath"));
     EXPECT_EQ(added["newPath"], "/F/New");
     EXPECT_TRUE(added.contains("fieldDiffs"));
 
-    const nlohmann::json modified = j["entries"][3];
+    const nlohmann::json removed = payload["entries"][1];
+    EXPECT_FALSE(removed.contains("newPath"));
+    EXPECT_EQ(removed["oldPath"], "/F/Old");
+
+    const nlohmann::json modified = payload["entries"][3];
     EXPECT_EQ(modified["kind"], "modified");
     ASSERT_EQ(modified["fieldDiffs"].size(), 1U);
     EXPECT_EQ(modified["fieldDiffs"][0]["field"], "length");

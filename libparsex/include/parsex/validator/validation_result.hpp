@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include <parsex/raw/raw_span.hpp>
 
 // Shared result type for every Validator check (schema, references,
@@ -37,4 +39,14 @@ struct ValidationResult {
     [[nodiscard]] bool hasErrors() const noexcept;
     [[nodiscard]] bool hasWarnings() const noexcept;
     void merge(const ValidationResult& other);
+
+    // Structured JSON rendering (PAR-174): envelope-wrapped
+    // ($schema/contractVersion/toolVersion/kind/payload) per
+    // schemas/envelope.schema.json with kind "validationResult".
+    // Optional error context (location/path/expectedType/actualType) is
+    // omitted when absent, per schemas/CONVENTIONS.md.
+    [[nodiscard]] nlohmann::json toJson() const;
+    // Round-trip support for tests. Accepts either the full envelope (as
+    // produced by toJson) or a bare payload object.
+    [[nodiscard]] static ValidationResult fromJson(const nlohmann::json& jsonDoc);
 };

@@ -65,11 +65,13 @@ struct DiffReport {
     // Human-readable text rendering (PAR-132), grouped by category.
     [[nodiscard]] std::string toText() const;
 
-    // Structured JSON rendering (PAR-133): faithful, parseable representation
-    // of DiffReport. Deliberately simple/flat — the future JSON Output
-    // Contract Feature formalizes a project-wide schema later.
+    // Structured JSON rendering (PAR-133, migrated to the formal contract in
+    // PAR-174): envelope-wrapped ($schema/contractVersion/toolVersion/kind/
+    // payload) per schemas/envelope.schema.json with kind "diffReport".
+    // Absent paths are omitted, per schemas/CONVENTIONS.md.
     [[nodiscard]] nlohmann::json toJson() const;
-    // Round-trip support for tests (not long-term public API).
+    // Round-trip support for tests. Accepts either the full envelope (as
+    // produced by toJson) or a bare payload object.
     [[nodiscard]] static DiffReport fromJson(const nlohmann::json& jsonDoc);
 };
 
