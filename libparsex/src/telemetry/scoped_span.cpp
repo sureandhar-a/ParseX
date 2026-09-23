@@ -38,6 +38,7 @@ TimePoint processStartTimePoint() {
     return start;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init): body assignment is by design — the disabled path returns before any construction/clock/stack work, so init-list construction would defeat the overhead guarantee.
 ScopedSpan::ScopedSpan(std::string_view name) {
     if (!TelemetryConfig::isEnabled()) {
         return;
@@ -64,6 +65,19 @@ ScopedSpan::~ScopedSpan() {
     if (!active_) {
         return;
     }
+    // Telemetry must never throw out of a destructor: every allocating call
+    // below (string copy, Trace push_back) sits inside try/catch, so an
+    // allocation failure drops that span instead of terminating the process.
+    try {
+        finalize();
+        // Intentionally swallowed: allocation failure while finalizing a span
+        // drops that span — telemetry must never terminate the process.
+        // NOLINTNEXTLINE(bugprone-empty-catch)
+    } catch (...) {
+    }
+}
+
+void ScopedSpan::finalize() {
     const TimePoint endPoint = Clock::now();
     const TimePoint origin = processStartTimePoint();
 
@@ -99,7 +113,9 @@ ScopedSpan::~ScopedSpan() {
                 break;
             }
         }
-        assert(found && "ScopedSpan destroyed out of order or twice");
+        // Message as a comment: assert(found && "...") trips
+        // readability-implicit-bool-conversion on the string literal.
+        assert(found);  // ScopedSpan destroyed out of order or twice
         (void)found;
     }
 
@@ -110,7 +126,7 @@ void ScopedSpan::setAttribute(std::string key, AttributeValue value) {
     if (!active_) {
         return;
     }
-    attributes_.push_back(Attribute{std::move(key), std::move(value)});
+    attributes_.push_back(Attribute{.key = std::move(key), .value = std::move(value)});
 }
 
 void ScopedSpan::setStatus(SpanStatus status) {

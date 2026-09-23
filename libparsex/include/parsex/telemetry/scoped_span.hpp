@@ -51,6 +51,11 @@ public:
     }
 
 private:
+    // Destructor body split out so ~ScopedSpan can guard it with
+    // try/catch(...) (bugprone-exception-escape): a span dropped on
+    // allocation failure must never terminate the instrumented process.
+    void finalize();
+
     std::string name_;
     SpanId id_{};
     std::optional<SpanId> parentId_;
