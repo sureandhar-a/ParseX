@@ -26,5 +26,6 @@ target_compile_definitions(
     diff_tests
     PRIVATE
     DIFF_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden"
+    PARSEX_SCHEMAS_DIR="${CMAKE_SOURCE_DIR}/schemas"
 )
 gtest_discover_tests(diff_tests)

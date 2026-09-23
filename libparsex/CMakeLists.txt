@@ -9,6 +9,8 @@ add_library(libparsex STATIC
     src/release_detector.cpp
     src/model_builder.cpp
     src/parser.cpp
+    src/json_contract/envelope.cpp
+    src/json_contract/schema_validate.cpp
     src/diff/diff_report.cpp
     src/diff/diff_match.cpp
     src/diff/diff_moves.cpp
@@ -48,8 +50,10 @@ target_compile_definitions(libparsex PRIVATE
 
 find_package(LibXml2 REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(nlohmann_json_schema_validator CONFIG REQUIRED)
 find_package(boost_pfr CONFIG REQUIRED)
 
 # Link dependencies to the library target so they propagate to consumers
 target_link_libraries(libparsex PUBLIC LibXml2::LibXml2 nlohmann_json::nlohmann_json
+                                       nlohmann_json_schema_validator::validator
                                        Boost::pfr)

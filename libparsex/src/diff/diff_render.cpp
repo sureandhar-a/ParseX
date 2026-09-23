@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <sstream>
+#include <string>
+
+#include <parsex/json_contract/envelope.hpp>
 
 // Human-readable text rendering (PAR-132).
 // Groups entries into Added/Removed/Moved/Modified sections in fixed order,
@@ -114,14 +117,20 @@ DiffKind kindFromJson(const std::string& kindName) {
 }  // namespace
 
 nlohmann::json DiffReport::toJson() const {
-    nlohmann::json reportJson;
-    reportJson["entries"] = nlohmann::json::array();
+    nlohmann::json payload;
+    payload["entries"] = nlohmann::json::array();
     for (const auto& entry : entries) {
         nlohmann::json entryJson;
         entryJson["kind"] = kindToJson(entry.kind);
         entryJson["elementType"] = entry.elementType;
-        entryJson["oldPath"] = entry.oldPath;
-        entryJson["newPath"] = entry.newPath;
+        // Omit-optional per CONVENTIONS.md (PAR-174 migration): absent paths
+        // travel as missing keys, not empty strings as pre-contract code did.
+        if (!entry.oldPath.empty()) {
+            entryJson["oldPath"] = entry.oldPath;
+        }
+        if (!entry.newPath.empty()) {
+            entryJson["newPath"] = entry.newPath;
+        }
         entryJson["fieldDiffs"] = nlohmann::json::array();
         for (const auto& field : entry.fieldDiffs) {
             nlohmann::json fieldJson;
@@ -130,39 +139,43 @@ nlohmann::json DiffReport::toJson() const {
             fieldJson["newValue"] = field.newValue;
             entryJson["fieldDiffs"].push_back(std::move(fieldJson));
         }
-        reportJson["entries"].push_back(std::move(entryJson));
+        payload["entries"].push_back(std::move(entryJson));
     }
-    reportJson["diagnostics"] = nlohmann::json::array();
+    payload["diagnostics"] = nlohmann::json::array();
     for (const auto& diag : diagnostics) {
         nlohmann::json diagJson;
         diagJson["elementType"] = diag.elementType;
         diagJson["message"] = diag.message;
-        reportJson["diagnostics"].push_back(std::move(diagJson));
+        payload["diagnostics"].push_back(std::move(diagJson));
     }
-    return reportJson;
+    // Envelope via the shared helper (PAR-176): single construction site.
+    return parsex::json_contract::wrapEnvelope("diffReport", std::move(payload));
 }
 
 DiffReport DiffReport::fromJson(const nlohmann::json& jsonDoc) {
+    // Accept the full envelope (as produced by toJson) or a bare payload.
+    const nlohmann::json& payload =
+        (jsonDoc.is_object() && jsonDoc.contains("payload")) ? jsonDoc.at("payload") : jsonDoc;
     DiffReport report;
-    for (const auto& entryJson : jsonDoc.at("entries")) {
+    for (const auto& entryJson : payload.at("entries")) {
         DiffEntry entry;
         entry.kind = kindFromJson(entryJson.at("kind").get<std::string>());
         entry.elementType = entryJson.at("elementType").get<std::string>();
-        entry.oldPath = entryJson.at("oldPath").get<std::string>();
-        entry.newPath = entryJson.at("newPath").get<std::string>();
+        entry.oldPath = entryJson.value("oldPath", "");
+        entry.newPath = entryJson.value("newPath", "");
         for (const auto& fieldJson : entryJson.at("fieldDiffs")) {
             entry.fieldDiffs.push_back(
                 {.fieldName = fieldJson.at("field").get<std::string>(),
                  .oldValue = fieldJson.at("oldValue").get<std::string>(),
-                 .newValue = fieldJson.at("newValue").get<std::string>()});
+                 .newValue = fieldJson.at("newValue").get<std::string>(),});
         }
         report.entries.push_back(std::move(entry));
     }
-    if (jsonDoc.contains("diagnostics")) {
-        for (const auto& diagJson : jsonDoc.at("diagnostics")) {
+    if (payload.contains("diagnostics")) {
+        for (const auto& diagJson : payload.at("diagnostics")) {
             report.diagnostics.push_back(
                 {.message = diagJson.at("message").get<std::string>(),
-                 .elementType = diagJson.at("elementType").get<std::string>()});
+                 .elementType = diagJson.at("elementType").get<std::string>(),});
         }
     }
     return report;

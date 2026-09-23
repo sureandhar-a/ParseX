@@ -4,6 +4,7 @@
     "dependencies": [
         "libxml2",
         "nlohmann-json",
+        "json-schema-validator",
         "cli11",
         "gtest",
         "boost-pfr"

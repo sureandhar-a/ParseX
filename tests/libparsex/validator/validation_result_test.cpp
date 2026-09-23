@@ -2,7 +2,12 @@
 // hasErrors()/hasWarnings()/merge() on empty and non-empty results.
 #include <gtest/gtest.h>
 
+#include <filesystem>
+
+#include <parsex/json_contract/schema_validate.hpp>
+#include <parsex/json_contract/version.hpp>
 #include <parsex/validator/validation_result.hpp>
+#include <parsex/version.hpp>
 
 TEST(ValidationResultTest, EmptyHasNeitherErrorsNorWarnings) {
     ValidationResult result;
@@ -36,4 +41,66 @@ TEST(ValidationResultTest, MergeAppends) {
     EXPECT_TRUE(a.hasWarnings());
     // Merging must not mutate the source.
     EXPECT_EQ(b.errors.size(), 1U);
+}
+
+TEST(ValidationResultTest, ToJsonProducesEnvelopeWrappedShape) {
+    ValidationResult result;
+    result.errors.push_back({.severity = Severity::Error,
+                             .code = "can.dlc_mismatch",
+                             .message = "DLC 8 != 64",
+                             .path = std::string("/Cluster/CAN/Frame")});
+
+    const nlohmann::json j = result.toJson();
+    EXPECT_EQ(j["kind"], "validationResult");
+    EXPECT_EQ(j["contractVersion"], std::string(parsex::json_contract::kContractVersion));
+    EXPECT_EQ(j["toolVersion"], std::string(libparsexVersion()));
+    ASSERT_TRUE(j.contains("payload"));
+
+    const nlohmann::json& payload = j["payload"];
+    EXPECT_FALSE(payload["passed"].get<bool>());
+    ASSERT_EQ(payload["errors"].size(), 1U);
+    EXPECT_EQ(payload["errors"][0]["severity"], "error");
+    EXPECT_EQ(payload["errors"][0]["code"], "can.dlc_mismatch");
+    EXPECT_EQ(payload["errors"][0]["path"], "/Cluster/CAN/Frame");
+    // Omit-optional: unset location/expectedType/actualType are missing, not null.
+    EXPECT_FALSE(payload["errors"][0].contains("location"));
+    EXPECT_FALSE(payload["errors"][0].contains("expectedType"));
+}
+
+TEST(ValidationResultTest, RoundTripPreservesErrors) {
+    ValidationResult original;
+    original.errors.push_back({.severity = Severity::Error, .code = "a", .message = "a"});
+    original.errors.push_back({.severity = Severity::Warning,
+                               .code = "b",
+                               .message = "b",
+                               .expectedType = std::string("FRAME"),
+                               .actualType = std::string("PDU")});
+
+    const ValidationResult restored = ValidationResult::fromJson(original.toJson());
+    ASSERT_EQ(restored.errors.size(), 2U);
+    EXPECT_EQ(restored.errors[0].severity, Severity::Error);
+    EXPECT_EQ(restored.errors[0].code, "a");
+    EXPECT_FALSE(restored.errors[0].expectedType.has_value());
+    EXPECT_EQ(restored.errors[1].severity, Severity::Warning);
+    EXPECT_EQ(restored.errors[1].expectedType, "FRAME");
+    EXPECT_EQ(restored.errors[1].actualType, "PDU");
+}
+
+TEST(ValidationResultTest, ToJsonConformsToEnvelopeSchema) {
+#ifdef PARSEX_SCHEMAS_DIR
+    const std::filesystem::path schemaPath =
+        std::filesystem::path(PARSEX_SCHEMAS_DIR) / "envelope.schema.json";
+#else
+    const std::filesystem::path schemaPath = "schemas/envelope.schema.json";
+#endif
+    ValidationResult result;
+    result.errors.push_back({.severity = Severity::Error,
+                             .code = "can.dlc_mismatch",
+                             .message = "DLC 8 != 64",
+                             .location = RawSpan{.startOffset = 0,
+                                                 .endOffset = 10,
+                                                 .lineNumber = 3}});
+    std::string error;
+    EXPECT_TRUE(parsex::json_contract::validatesAgainstSchema(result.toJson(), schemaPath, &error))
+        << error;
 }
