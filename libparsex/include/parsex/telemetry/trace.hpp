@@ -2,6 +2,8 @@
 
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include "parsex/telemetry/span.hpp"
 
 // Trace data structure for the Telemetry Feature (PAR-185).
@@ -14,6 +16,11 @@ namespace parsex::telemetry {
 
 struct Trace {
     std::vector<Span> spans;
+
+    // Structured JSON rendering (PAR-195): envelope-wrapped per
+    // schemas/envelope.schema.json with kind "telemetryReport". Root spans
+    // omit parentSpanId (omit-over-null per CONVENTIONS.md).
+    [[nodiscard]] nlohmann::json toJson() const;
 };
 
 [[nodiscard]] std::vector<const Span*> children(const Trace& trace, SpanId parent);
