@@ -1,6 +1,7 @@
 add_executable(json_contract_tests
     envelope_schema_test.cpp
     conventions_test.cpp
+    version_test.cpp
 )
 target_link_libraries(
     json_contract_tests
