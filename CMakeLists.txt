@@ -55,6 +55,11 @@ endif()
 
 option(PARSEX_ENABLE_SANITIZERS "Build with ASan+UBSan instrumentation" OFF)
 
+option(PARSEX_ENABLE_TELEMETRY "Compile in ParseX's telemetry instrumentation" ON)
+if(NOT PARSEX_ENABLE_TELEMETRY)
+    add_compile_definitions(PARSEX_TELEMETRY_DISABLED)
+endif()
+
 add_library(parsex_sanitizers INTERFACE)
 if(PARSEX_ENABLE_SANITIZERS)
   target_compile_options(parsex_sanitizers INTERFACE
