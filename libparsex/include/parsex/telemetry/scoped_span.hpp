@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "parsex/telemetry/attribute.hpp"
@@ -28,7 +29,10 @@ using TimePoint = std::chrono::steady_clock::time_point;
 
 class ScopedSpan {
 public:
-    explicit ScopedSpan(std::string name);
+    // Takes string_view so the disabled path costs no allocation: the view
+    // is copied (two words) and the constructor returns early on !isEnabled()
+    // before any string construction, clock read, or stack push.
+    explicit ScopedSpan(std::string_view name);
     ~ScopedSpan();
 
     ScopedSpan(const ScopedSpan&) = delete;

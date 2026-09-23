@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <exception>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -37,11 +38,12 @@ TimePoint processStartTimePoint() {
     return start;
 }
 
-ScopedSpan::ScopedSpan(std::string name) : name_(std::move(name)) {
+ScopedSpan::ScopedSpan(std::string_view name) {
     if (!TelemetryConfig::isEnabled()) {
         return;
     }
     active_ = true;
+    name_ = std::string(name);
     id_ = nextSpanId();
     auto& stack = activeSpanStack();
     if (!stack.empty()) {
