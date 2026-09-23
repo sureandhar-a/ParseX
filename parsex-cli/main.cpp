@@ -7,6 +7,7 @@
 #include "parsex/validator/validation_result.hpp"
 #include "parsex/version.hpp"
 #include "color.hpp"
+#include "exit_code.hpp"
 
 using namespace std;
 
