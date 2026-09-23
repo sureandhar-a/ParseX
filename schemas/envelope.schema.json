@@ -1,0 +1,34 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://parsex.dev/schemas/v1/envelope.json",
+    "title": "ParseX JSON Output Envelope",
+    "description": "Top-level envelope every ParseX JSON-emitting Feature produces. The kind-specific body lives in 'payload'; envelope-level keys are a closed set (see additionalProperties note below).",
+    "type": "object",
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "URI reference to the schema defining this document's format."
+        },
+        "contractVersion": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "description": "ParseX JSON contract version (semver). Single project-wide constant; see schemas/VERSIONING.md."
+        },
+        "toolVersion": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ParseX build version that produced this document."
+        },
+        "kind": {
+            "type": "string",
+            "enum": ["validationResult", "diffReport"],
+            "description": "Discriminator for the kind-specific payload shape. Extensible in later minor versions."
+        },
+        "payload": {
+            "description": "Kind-specific body. Left unconstrained (true) at the envelope level; tightened per-kind via $ref once validationResult/diffReport payload schemas land (PAR-164)."
+        }
+    },
+    "required": ["contractVersion", "toolVersion", "kind", "payload"],
+    "additionalProperties": false
+}
