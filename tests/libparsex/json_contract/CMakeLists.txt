@@ -7,6 +7,7 @@ add_executable(json_contract_tests
     payload_schemas_test.cpp
     schema_conformance_test.cpp
     envelope_helper_test.cpp
+    json_contract_e2e_test.cpp
 )
 target_link_libraries(
     json_contract_tests
