@@ -8,7 +8,7 @@
 namespace {
 
 std::string joinSorted(std::vector<std::string> items, const char* sep = ",") {
-    std::sort(items.begin(), items.end());
+    std::ranges::sort(items);
     std::string out;
     for (std::size_t i = 0; i < items.size(); ++i) {
         if (i > 0) {
@@ -27,61 +27,61 @@ std::string joinSorted(std::vector<std::string> items, const char* sep = ",") {
 // most identity-like non-path fields available. If a CAN ID field is added to
 // Frame later, prefer it here (and parent-Pdu + startBit for Signal).
 
-std::optional<std::string> secondaryKey(const Cluster& c) {
+std::optional<std::string> secondaryKey(const Cluster& cluster) {
     std::ostringstream oss;
     oss << "baud:";
-    if (c.baudrate.has_value()) {
-        oss << *c.baudrate;
+    if (cluster.baudrate.has_value()) {
+        oss << *cluster.baudrate;
     } else {
         oss << "-";
     }
-    oss << "|ch:" << joinSorted(c.physicalChannels);
+    oss << "|ch:" << joinSorted(cluster.physicalChannels);
     return oss.str();
 }
 
-std::optional<std::string> secondaryKey(const EcuInstance& e) {
+std::optional<std::string> secondaryKey(const EcuInstance& ecu) {
     std::ostringstream oss;
-    oss << "ch:" << joinSorted(e.connectedChannels);
-    oss << "|ctrl:" << joinSorted(e.controllers);
+    oss << "ch:" << joinSorted(ecu.connectedChannels);
+    oss << "|ctrl:" << joinSorted(ecu.controllers);
     return oss.str();
 }
 
-std::optional<std::string> secondaryKey(const Frame& f) {
+std::optional<std::string> secondaryKey(const Frame& frame) {
     std::ostringstream oss;
-    oss << "len:" << f.length;
-    oss << "|tx:" << joinSorted(f.transmitters);
+    oss << "len:" << frame.length;
+    oss << "|tx:" << joinSorted(frame.transmitters);
     std::vector<std::string> mappings;
-    mappings.reserve(f.pdus.size());
-    for (const auto& m : f.pdus) {
-        mappings.push_back(m.pduShortNameRef + "@" + std::to_string(m.startPosition));
+    mappings.reserve(frame.pdus.size());
+    for (const auto& mapping : frame.pdus) {
+        mappings.push_back(mapping.pduShortNameRef + "@" + std::to_string(mapping.startPosition));
     }
     oss << "|pdu:" << joinSorted(mappings);
     return oss.str();
 }
 
-std::optional<std::string> secondaryKey(const Pdu& p) {
+std::optional<std::string> secondaryKey(const Pdu& pdu) {
     std::ostringstream oss;
-    oss << "len:" << p.length;
+    oss << "len:" << pdu.length;
     std::vector<std::string> mappings;
-    mappings.reserve(p.signalMappings.size());
-    for (const auto& m : p.signalMappings) {
-        mappings.push_back(m.signalShortNameRef + "@" + std::to_string(m.startPosition));
+    mappings.reserve(pdu.signalMappings.size());
+    for (const auto& mapping : pdu.signalMappings) {
+        mappings.push_back(mapping.signalShortNameRef + "@" + std::to_string(mapping.startPosition));
     }
     oss << "|sig:" << joinSorted(mappings);
     return oss.str();
 }
 
-std::optional<std::string> secondaryKey(const Signal& s) {
+std::optional<std::string> secondaryKey(const Signal& signal) {
     std::ostringstream oss;
-    oss << "start:" << s.startBit << "|len:" << s.bitLength;
+    oss << "start:" << signal.startBit << "|len:" << signal.bitLength;
     oss << "|order:"
-        << (s.byteOrder == ByteOrder::MostSignificantByteFirst ? "M" : "L");
-    oss << "|rx:" << joinSorted(s.receivers);
+        << (signal.byteOrder == ByteOrder::MostSignificantByteFirst ? "M" : "L");
+    oss << "|rx:" << joinSorted(signal.receivers);
     return oss.str();
 }
 
-std::optional<std::string> secondaryKey(const SignalGroup& g) {
-    return std::string("m:") + joinSorted(g.members);
+std::optional<std::string> secondaryKey(const SignalGroup& group) {
+    return std::string("m:") + joinSorted(group.members);
 }
 
 namespace {

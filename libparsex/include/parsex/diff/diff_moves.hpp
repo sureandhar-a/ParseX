@@ -28,12 +28,12 @@
 // Signal has startBit/bitLength/byteOrder/receivers). The keys below use the
 // most identity-like non-path fields actually present; see TODO in
 // diff_moves.cpp for the CAN-ID gap.
-[[nodiscard]] std::optional<std::string> secondaryKey(const Cluster& c);
-[[nodiscard]] std::optional<std::string> secondaryKey(const EcuInstance& e);
-[[nodiscard]] std::optional<std::string> secondaryKey(const Frame& f);
-[[nodiscard]] std::optional<std::string> secondaryKey(const Pdu& p);
-[[nodiscard]] std::optional<std::string> secondaryKey(const Signal& s);
-[[nodiscard]] std::optional<std::string> secondaryKey(const SignalGroup& g);
+[[nodiscard]] std::optional<std::string> secondaryKey(const Cluster& cluster);
+[[nodiscard]] std::optional<std::string> secondaryKey(const EcuInstance& ecu);
+[[nodiscard]] std::optional<std::string> secondaryKey(const Frame& frame);
+[[nodiscard]] std::optional<std::string> secondaryKey(const Pdu& pdu);
+[[nodiscard]] std::optional<std::string> secondaryKey(const Signal& signal);
+[[nodiscard]] std::optional<std::string> secondaryKey(const SignalGroup& group);
 
 // Correlate Removed/Added entries of one domain type into Moved entries.
 //
@@ -113,7 +113,7 @@ void detectMovesForType(const std::map<std::string, const T*>& oldIndex,
         std::vector<DiffEntry> kept;
         kept.reserve(report.entries.size() - addedToErase.size());
         std::size_t erasePos = 0;
-        std::sort(addedToErase.begin(), addedToErase.end());
+        std::ranges::sort(addedToErase);
         for (std::size_t i = 0; i < report.entries.size(); ++i) {
             if (erasePos < addedToErase.size() && addedToErase[erasePos] == i) {
                 ++erasePos;

@@ -24,10 +24,11 @@ std::vector<T> collectAll(const ParsedProject& project, Member member) {
 
 template <typename T>
 const T* lookup(const std::map<std::string, const T*>& index, const std::string& path) {
-    const auto it = index.find(path);
-    return it != index.end() ? it->second : nullptr;
+    const auto found = index.find(path);
+    return found != index.end() ? found->second : nullptr;
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): call sites pass (type, old path, new path, then old/new index pairs) in documented order; the names differ by role.
 std::vector<FieldDiff> diffPair(const std::string& type, const std::string& oldPath,
                                 const std::string& newPath,
                                 const std::map<std::string, const Cluster*>& oldClusters,
@@ -43,35 +44,35 @@ std::vector<FieldDiff> diffPair(const std::string& type, const std::string& oldP
                                 const std::map<std::string, const SignalGroup*>& oldGroups,
                                 const std::map<std::string, const SignalGroup*>& newGroups) {
     if (type == "Cluster") {
-        const Cluster* o = lookup(oldClusters, oldPath);
-        const Cluster* n = lookup(newClusters, newPath);
-        return (o != nullptr && n != nullptr) ? diffStruct(*o, *n) : std::vector<FieldDiff>{};
+        const Cluster* oldElem = lookup(oldClusters, oldPath);
+        const Cluster* newElem = lookup(newClusters, newPath);
+        return (oldElem != nullptr && newElem != nullptr) ? diffStruct(*oldElem, *newElem) : std::vector<FieldDiff>{};
     }
     if (type == "EcuInstance") {
-        const EcuInstance* o = lookup(oldEcus, oldPath);
-        const EcuInstance* n = lookup(newEcus, newPath);
-        return (o != nullptr && n != nullptr) ? diffStruct(*o, *n) : std::vector<FieldDiff>{};
+        const EcuInstance* oldElem = lookup(oldEcus, oldPath);
+        const EcuInstance* newElem = lookup(newEcus, newPath);
+        return (oldElem != nullptr && newElem != nullptr) ? diffStruct(*oldElem, *newElem) : std::vector<FieldDiff>{};
     }
     if (type == "Frame") {
-        const Frame* o = lookup(oldFrames, oldPath);
-        const Frame* n = lookup(newFrames, newPath);
-        return (o != nullptr && n != nullptr) ? diffFrameElements(*o, *n) : std::vector<FieldDiff>{};
+        const Frame* oldElem = lookup(oldFrames, oldPath);
+        const Frame* newElem = lookup(newFrames, newPath);
+        return (oldElem != nullptr && newElem != nullptr) ? diffFrameElements(*oldElem, *newElem) : std::vector<FieldDiff>{};
     }
     if (type == "Pdu") {
-        const Pdu* o = lookup(oldPdus, oldPath);
-        const Pdu* n = lookup(newPdus, newPath);
-        return (o != nullptr && n != nullptr) ? diffPduElements(*o, *n) : std::vector<FieldDiff>{};
+        const Pdu* oldElem = lookup(oldPdus, oldPath);
+        const Pdu* newElem = lookup(newPdus, newPath);
+        return (oldElem != nullptr && newElem != nullptr) ? diffPduElements(*oldElem, *newElem) : std::vector<FieldDiff>{};
     }
     if (type == "Signal") {
-        const Signal* o = lookup(oldSignals, oldPath);
-        const Signal* n = lookup(newSignals, newPath);
-        return (o != nullptr && n != nullptr) ? diffSignalElements(*o, *n)
+        const Signal* oldElem = lookup(oldSignals, oldPath);
+        const Signal* newElem = lookup(newSignals, newPath);
+        return (oldElem != nullptr && newElem != nullptr) ? diffSignalElements(*oldElem, *newElem)
                                               : std::vector<FieldDiff>{};
     }
     if (type == "SignalGroup") {
-        const SignalGroup* o = lookup(oldGroups, oldPath);
-        const SignalGroup* n = lookup(newGroups, newPath);
-        return (o != nullptr && n != nullptr) ? diffSignalGroupElements(*o, *n)
+        const SignalGroup* oldElem = lookup(oldGroups, oldPath);
+        const SignalGroup* newElem = lookup(newGroups, newPath);
+        return (oldElem != nullptr && newElem != nullptr) ? diffSignalGroupElements(*oldElem, *newElem)
                                               : std::vector<FieldDiff>{};
     }
     return {};

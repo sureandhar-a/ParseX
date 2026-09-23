@@ -70,10 +70,10 @@ struct DiffReport {
     // Contract Feature formalizes a project-wide schema later.
     [[nodiscard]] nlohmann::json toJson() const;
     // Round-trip support for tests (not long-term public API).
-    [[nodiscard]] static DiffReport fromJson(const nlohmann::json& j);
+    [[nodiscard]] static DiffReport fromJson(const nlohmann::json& jsonDoc);
 };
 
 [[nodiscard]] std::string toString(DiffKind kind);
-std::ostream& operator<<(std::ostream& os, DiffKind kind);
-std::ostream& operator<<(std::ostream& os, const DiffEntry& entry);
-std::ostream& operator<<(std::ostream& os, const DiffReport& report);
+std::ostream& operator<<(std::ostream& stream, DiffKind kind);
+std::ostream& operator<<(std::ostream& stream, const DiffEntry& entry);
+std::ostream& operator<<(std::ostream& stream, const DiffReport& report);

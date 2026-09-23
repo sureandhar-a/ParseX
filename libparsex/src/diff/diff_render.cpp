@@ -1,5 +1,6 @@
 #include <parsex/diff/diff_report.hpp>
 
+#include <algorithm>
 #include <sstream>
 
 // Human-readable text rendering (PAR-132).
@@ -7,54 +8,60 @@
 // skipping empty sections. Plain text, consistent indentation, grep-friendly
 // — meant for terminals and review comments, not fancy tables.
 
+namespace {
+
+void renderFieldLines(std::ostringstream& text, const DiffEntry& entry) {
+    for (const auto& field : entry.fieldDiffs) {
+        text << "    " << field.fieldName << ": " << field.oldValue << " -> " << field.newValue
+             << "\n";
+    }
+}
+
+void renderEntryLines(std::ostringstream& text, const DiffEntry& entry) {
+    switch (entry.kind) {
+        case DiffKind::Added:
+            text << "  " << entry.elementType << " " << entry.newPath << "\n";
+            break;
+        case DiffKind::Removed:
+            text << "  " << entry.elementType << " " << entry.oldPath << "\n";
+            break;
+        case DiffKind::Moved:
+            text << "  " << entry.elementType << " " << entry.oldPath << " -> " << entry.newPath
+                 << "\n";
+            renderFieldLines(text, entry);
+            break;
+        case DiffKind::Modified:
+            text << "  " << entry.elementType << " " << entry.newPath << "\n";
+            renderFieldLines(text, entry);
+            break;
+    }
+}
+
+bool hasKind(const std::vector<DiffEntry>& entries, DiffKind kind) {
+    return std::ranges::any_of(
+        entries, [kind](const DiffEntry& entry) { return entry.kind == kind; });
+}
+
+}  // namespace
+
 std::string DiffReport::toText() const {
     if (entries.empty() && diagnostics.empty()) {
         return "No differences.\n";
     }
-    std::ostringstream oss;
+    std::ostringstream text;
     bool firstSection = true;
     const auto emitSection = [&](const char* title, DiffKind kind) {
-        bool any = false;
-        for (const auto& e : entries) {
-            if (e.kind == kind) {
-                any = true;
-                break;
-            }
-        }
-        if (!any) {
+        if (!hasKind(entries, kind)) {
             return;
         }
         if (!firstSection) {
-            oss << "\n";
+            text << "\n";
         }
         firstSection = false;
-        oss << title << ":\n";
-        for (const auto& e : entries) {
-            if (e.kind != kind) {
-                continue;
-            }
-            switch (kind) {
-                case DiffKind::Added:
-                    oss << "  " << e.elementType << " " << e.newPath << "\n";
-                    break;
-                case DiffKind::Removed:
-                    oss << "  " << e.elementType << " " << e.oldPath << "\n";
-                    break;
-                case DiffKind::Moved:
-                    oss << "  " << e.elementType << " " << e.oldPath << " -> " << e.newPath
-                        << "\n";
-                    for (const auto& f : e.fieldDiffs) {
-                        oss << "    " << f.fieldName << ": " << f.oldValue << " -> " << f.newValue
-                            << "\n";
-                    }
-                    break;
-                case DiffKind::Modified:
-                    oss << "  " << e.elementType << " " << e.newPath << "\n";
-                    for (const auto& f : e.fieldDiffs) {
-                        oss << "    " << f.fieldName << ": " << f.oldValue << " -> " << f.newValue
-                            << "\n";
-                    }
-                    break;
+        text << title << ":\n";
+        for (const auto& entry : entries) {
+            if (entry.kind == kind) {
+                renderEntryLines(text, entry);
             }
         }
     };
@@ -65,14 +72,14 @@ std::string DiffReport::toText() const {
 
     if (!diagnostics.empty()) {
         if (!firstSection) {
-            oss << "\n";
+            text << "\n";
         }
-        oss << "Diagnostics:\n";
-        for (const auto& d : diagnostics) {
-            oss << "  [" << d.elementType << "] " << d.message << "\n";
+        text << "Diagnostics:\n";
+        for (const auto& diag : diagnostics) {
+            text << "  [" << diag.elementType << "] " << diag.message << "\n";
         }
     }
-    return oss.str();
+    return text.str();
 }
 
 namespace {
@@ -91,14 +98,14 @@ std::string kindToJson(DiffKind kind) {
     return "unknown";
 }
 
-DiffKind kindFromJson(const std::string& s) {
-    if (s == "added") {
+DiffKind kindFromJson(const std::string& kindName) {
+    if (kindName == "added") {
         return DiffKind::Added;
     }
-    if (s == "removed") {
+    if (kindName == "removed") {
         return DiffKind::Removed;
     }
-    if (s == "moved") {
+    if (kindName == "moved") {
         return DiffKind::Moved;
     }
     return DiffKind::Modified;
@@ -107,53 +114,55 @@ DiffKind kindFromJson(const std::string& s) {
 }  // namespace
 
 nlohmann::json DiffReport::toJson() const {
-    nlohmann::json j;
-    j["entries"] = nlohmann::json::array();
-    for (const auto& e : entries) {
-        nlohmann::json entry;
-        entry["kind"] = kindToJson(e.kind);
-        entry["elementType"] = e.elementType;
-        entry["oldPath"] = e.oldPath;
-        entry["newPath"] = e.newPath;
-        entry["fieldDiffs"] = nlohmann::json::array();
-        for (const auto& f : e.fieldDiffs) {
-            nlohmann::json field;
-            field["field"] = f.fieldName;
-            field["oldValue"] = f.oldValue;
-            field["newValue"] = f.newValue;
-            entry["fieldDiffs"].push_back(std::move(field));
+    nlohmann::json reportJson;
+    reportJson["entries"] = nlohmann::json::array();
+    for (const auto& entry : entries) {
+        nlohmann::json entryJson;
+        entryJson["kind"] = kindToJson(entry.kind);
+        entryJson["elementType"] = entry.elementType;
+        entryJson["oldPath"] = entry.oldPath;
+        entryJson["newPath"] = entry.newPath;
+        entryJson["fieldDiffs"] = nlohmann::json::array();
+        for (const auto& field : entry.fieldDiffs) {
+            nlohmann::json fieldJson;
+            fieldJson["field"] = field.fieldName;
+            fieldJson["oldValue"] = field.oldValue;
+            fieldJson["newValue"] = field.newValue;
+            entryJson["fieldDiffs"].push_back(std::move(fieldJson));
         }
-        j["entries"].push_back(std::move(entry));
+        reportJson["entries"].push_back(std::move(entryJson));
     }
-    j["diagnostics"] = nlohmann::json::array();
-    for (const auto& d : diagnostics) {
-        nlohmann::json diag;
-        diag["elementType"] = d.elementType;
-        diag["message"] = d.message;
-        j["diagnostics"].push_back(std::move(diag));
+    reportJson["diagnostics"] = nlohmann::json::array();
+    for (const auto& diag : diagnostics) {
+        nlohmann::json diagJson;
+        diagJson["elementType"] = diag.elementType;
+        diagJson["message"] = diag.message;
+        reportJson["diagnostics"].push_back(std::move(diagJson));
     }
-    return j;
+    return reportJson;
 }
 
-DiffReport DiffReport::fromJson(const nlohmann::json& j) {
+DiffReport DiffReport::fromJson(const nlohmann::json& jsonDoc) {
     DiffReport report;
-    for (const auto& entry : j.at("entries")) {
-        DiffEntry e;
-        e.kind = kindFromJson(entry.at("kind").get<std::string>());
-        e.elementType = entry.at("elementType").get<std::string>();
-        e.oldPath = entry.at("oldPath").get<std::string>();
-        e.newPath = entry.at("newPath").get<std::string>();
-        for (const auto& field : entry.at("fieldDiffs")) {
-            e.fieldDiffs.push_back({.fieldName = field.at("field").get<std::string>(),
-                                    .oldValue = field.at("oldValue").get<std::string>(),
-                                    .newValue = field.at("newValue").get<std::string>()});
+    for (const auto& entryJson : jsonDoc.at("entries")) {
+        DiffEntry entry;
+        entry.kind = kindFromJson(entryJson.at("kind").get<std::string>());
+        entry.elementType = entryJson.at("elementType").get<std::string>();
+        entry.oldPath = entryJson.at("oldPath").get<std::string>();
+        entry.newPath = entryJson.at("newPath").get<std::string>();
+        for (const auto& fieldJson : entryJson.at("fieldDiffs")) {
+            entry.fieldDiffs.push_back(
+                {.fieldName = fieldJson.at("field").get<std::string>(),
+                 .oldValue = fieldJson.at("oldValue").get<std::string>(),
+                 .newValue = fieldJson.at("newValue").get<std::string>()});
         }
-        report.entries.push_back(std::move(e));
+        report.entries.push_back(std::move(entry));
     }
-    if (j.contains("diagnostics")) {
-        for (const auto& diag : j.at("diagnostics")) {
-            report.diagnostics.push_back({.message = diag.at("message").get<std::string>(),
-                                           .elementType = diag.at("elementType").get<std::string>()});
+    if (jsonDoc.contains("diagnostics")) {
+        for (const auto& diagJson : jsonDoc.at("diagnostics")) {
+            report.diagnostics.push_back(
+                {.message = diagJson.at("message").get<std::string>(),
+                 .elementType = diagJson.at("elementType").get<std::string>()});
         }
     }
     return report;

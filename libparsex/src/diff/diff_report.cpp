@@ -5,12 +5,15 @@
 #include <ostream>
 #include <sstream>
 
+// NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved): members are moved out via named locals below (then cleared); the parameter itself is intentionally not relocated wholesale.
 void DiffReport::merge(DiffReport&& other) {
-    entries.insert(entries.end(), std::make_move_iterator(other.entries.begin()),
-                   std::make_move_iterator(other.entries.end()));
+    std::vector<DiffEntry> incoming = std::move(other.entries);
+    entries.insert(entries.end(), std::make_move_iterator(incoming.begin()),
+                   std::make_move_iterator(incoming.end()));
     other.entries.clear();
-    diagnostics.insert(diagnostics.end(), std::make_move_iterator(other.diagnostics.begin()),
-                       std::make_move_iterator(other.diagnostics.end()));
+    std::vector<DiffDiagnostic> incomingDiags = std::move(other.diagnostics);
+    diagnostics.insert(diagnostics.end(), std::make_move_iterator(incomingDiags.begin()),
+                       std::make_move_iterator(incomingDiags.end()));
     other.diagnostics.clear();
 }
 
@@ -33,38 +36,40 @@ std::string toString(DiffKind kind) {
     return "Unknown";
 }
 
-std::ostream& operator<<(std::ostream& os, DiffKind kind) { return os << toString(kind); }
-
-std::ostream& operator<<(std::ostream& os, const DiffEntry& entry) {
-    os << "[" << entry.kind << "] " << entry.elementType;
-    switch (entry.kind) {
-        case DiffKind::Added:
-            os << " new=\"" << entry.newPath << "\"";
-            break;
-        case DiffKind::Removed:
-            os << " old=\"" << entry.oldPath << "\"";
-            break;
-        case DiffKind::Moved:
-            os << " old=\"" << entry.oldPath << "\" new=\"" << entry.newPath << "\"";
-            break;
-        case DiffKind::Modified:
-            os << " path=\"" << entry.newPath << "\"";
-            break;
-    }
-    os << " fields=" << entry.fieldDiffs.size();
-    return os;
+std::ostream& operator<<(std::ostream& stream, DiffKind kind) {
+    return stream << toString(kind);
 }
 
-std::ostream& operator<<(std::ostream& os, const DiffReport& report) {
-    os << "DiffReport(" << report.entries.size() << " entries, " << report.diagnostics.size()
-       << " diagnostics)";
+std::ostream& operator<<(std::ostream& stream, const DiffEntry& entry) {
+    stream << "[" << entry.kind << "] " << entry.elementType;
+    switch (entry.kind) {
+        case DiffKind::Added:
+            stream << " new=\"" << entry.newPath << "\"";
+            break;
+        case DiffKind::Removed:
+            stream << " old=\"" << entry.oldPath << "\"";
+            break;
+        case DiffKind::Moved:
+            stream << " old=\"" << entry.oldPath << "\" new=\"" << entry.newPath << "\"";
+            break;
+        case DiffKind::Modified:
+            stream << " path=\"" << entry.newPath << "\"";
+            break;
+    }
+    stream << " fields=" << entry.fieldDiffs.size();
+    return stream;
+}
+
+std::ostream& operator<<(std::ostream& stream, const DiffReport& report) {
+    stream << "DiffReport(" << report.entries.size() << " entries, " << report.diagnostics.size()
+           << " diagnostics)";
     for (const auto& entry : report.entries) {
-        os << "\n  " << entry;
+        stream << "\n  " << entry;
     }
     for (const auto& diag : report.diagnostics) {
-        os << "\n  [Diagnostic] " << diag.elementType << ": " << diag.message;
+        stream << "\n  [Diagnostic] " << diag.elementType << ": " << diag.message;
     }
-    return os;
+    return stream;
 }
 
 std::string DiffReport::toDebugString() const {
@@ -94,19 +99,20 @@ std::string sortKeyFor(const DiffEntry& entry) {
 }  // namespace
 
 void DiffReport::sortDeterministically() {
-    std::sort(entries.begin(), entries.end(), [](const DiffEntry& a, const DiffEntry& b) {
-        const std::string ka = sortKeyFor(a);
-        const std::string kb = sortKeyFor(b);
-        if (ka != kb) {
-            return ka < kb;
-        }
-        return a.elementType < b.elementType;
-    });
-    std::sort(diagnostics.begin(), diagnostics.end(), [](const DiffDiagnostic& a,
-                                                          const DiffDiagnostic& b) {
-        if (a.message != b.message) {
-            return a.message < b.message;
-        }
-        return a.elementType < b.elementType;
-    });
+    std::ranges::sort(entries,
+                      [](const DiffEntry& first, const DiffEntry& second) {
+                          const std::string firstKey = sortKeyFor(first);
+                          const std::string secondKey = sortKeyFor(second);
+                          if (firstKey != secondKey) {
+                              return firstKey < secondKey;
+                          }
+                          return first.elementType < second.elementType;
+                      });
+    std::ranges::sort(diagnostics,
+                      [](const DiffDiagnostic& first, const DiffDiagnostic& second) {
+                          if (first.message != second.message) {
+                              return first.message < second.message;
+                          }
+                          return first.elementType < second.elementType;
+                      });
 }
