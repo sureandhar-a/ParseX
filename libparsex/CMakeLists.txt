@@ -24,6 +24,7 @@ add_library(libparsex STATIC
     src/write/write_context.cpp
     src/write/write_elements.cpp
     src/write/write_ordering.cpp
+    src/write/write_format.cpp
 )
 
 # Tell targets linking against libparsex where to find its header files

@@ -2,6 +2,7 @@ add_executable(write_tests
     tree_construction_test.cpp
     ordering_test.cpp
     determinism_test.cpp
+    whitespace_guard_test.cpp
 )
 target_link_libraries(
     write_tests
