@@ -1,5 +1,6 @@
 add_executable(telemetry_tests
     telemetry_data_model_test.cpp
+    scoped_span_test.cpp
 )
 target_link_libraries(
     telemetry_tests
