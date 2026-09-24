@@ -3,7 +3,27 @@
 #include <cstdlib>
 #include <system_error>
 
+namespace {
+std::filesystem::path g_override;
+bool g_hasOverride{false};
+}  // namespace
+
+void setCacheDirectoryOverride(const std::filesystem::path& dir) {
+    g_override = dir;
+    g_hasOverride = true;
+}
+
+void clearCacheDirectoryOverride() {
+    g_override.clear();
+    g_hasOverride = false;
+}
+
 std::filesystem::path getCacheDirectory() {
+    if (g_hasOverride) {
+        std::error_code dirError;
+        std::filesystem::create_directories(g_override, dirError);
+        return g_override;
+    }
     std::filesystem::path base;
     if (const char* xdg = std::getenv("XDG_CACHE_HOME"); xdg != nullptr && *xdg != '\0') {
         base = xdg;

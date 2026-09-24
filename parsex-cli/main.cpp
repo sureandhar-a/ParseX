@@ -1,9 +1,12 @@
 #include <iostream>
 #include <string>
+#include <cstdlib>
+#include <filesystem>
 #include "CLI/CLI.hpp"
 #include <nlohmann/json.hpp>
 #include "parsex/diff/diff_report.hpp"
 #include "parsex/json_contract/envelope.hpp"
+#include "parsex/schema/cache_layout.hpp"
 #include "parsex/validator/validation_result.hpp"
 #include "parsex/version.hpp"
 #include "color.hpp"
@@ -12,6 +15,49 @@
 using namespace std;
 
 namespace {
+
+// PAR-221: precedence helper flag > env > config > default.
+// Returns effective cache dir and source name; also applies the override via
+// setCacheDirectoryOverride() when not default. Logs at debug level to stderr
+// (not stdout) so --json's stdout stays clean. argc/argv are needed to detect
+// an explicit --schema-cache-dir flag, because CLI11's config-file values are
+// indistinguishable via count().
+inline std::pair<std::filesystem::path, std::string> resolveSchemaCacheDir(
+    int argc, char const* const* argv, const std::string& boundValue) {
+    bool flagPresent = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--schema-cache-dir" || arg.rfind("--schema-cache-dir=", 0) == 0) {
+            flagPresent = true;
+            break;
+        }
+    }
+    if (flagPresent) {
+        return {std::filesystem::path(boundValue), "flag"};
+    }
+    if (const char* env = std::getenv("PARSEX_SCHEMA_CACHE_DIR"); env != nullptr && env[0] != '\0') {
+        return {std::filesystem::path(env), "env"};
+    }
+    if (!boundValue.empty()) {
+        return {std::filesystem::path(boundValue), "config"};
+    }
+    return {{}, "default"};
+}
+
+inline void applySchemaCacheDir(int argc, char const* const* argv, const std::string& boundValue) {
+    static bool applied = false;
+    if (applied) {
+        return;
+    }
+    applied = true;
+    auto [effective, source] = resolveSchemaCacheDir(argc, argv, boundValue);
+    if (!effective.empty()) {
+        setCacheDirectoryOverride(effective);
+        std::cerr << "[debug] schema-cache-dir=" << effective.string() << " (" << source << ")\n";
+    } else {
+        std::cerr << "[debug] schema-cache-dir=" << getCacheDirectory().string() << " (" << source << ")\n";
+    }
+}
 
 // PAR-213: human-readable placeholders (real formatting arrives in PAR-206).
 inline std::string formatHumanParse(const std::string& input) {
@@ -74,6 +120,12 @@ int main(int argc, char const *argv[])
     // NOTE (PAR-214): human formatters gate any future ANSI codes behind
     // parsex::cli::colorEnabled(opts.noColor); no colored output exists yet.
 
+    // PAR-221: first real config-driven option, demonstrating the full
+    // flag > env > config > default chain. Config key is `schema-cache-dir`
+    // (matches the flag name minus leading --).
+    std::string schemaCacheDir;
+    app.add_option("--schema-cache-dir", schemaCacheDir, "Directory for cached AUTOSAR schemas");
+
     auto* parseCmd = app.add_subcommand("parse", "Parse an ARXML file and report its structure");
     auto* validateCmd = app.add_subcommand("validate", "Validate an ARXML file against ParseX rules");
     auto* diffCmd = app.add_subcommand("diff", "Diff two ARXML files");
@@ -94,6 +146,7 @@ int main(int argc, char const *argv[])
     diffCmd->add_option("--base", diffBase, "Base ARXML file")->required()->check(CLI::ExistingFile);
     diffCmd->add_option("--target", diffTarget, "Target ARXML file")->required()->check(CLI::ExistingFile);
     parseCmd->callback([&]() {
+        applySchemaCacheDir(argc, argv, schemaCacheDir);
         if (opts.jsonOutput) {
             std::cout << buildJsonParse(parseInput).dump(2) << "\n";
         } else {
@@ -101,6 +154,7 @@ int main(int argc, char const *argv[])
         }
     });
     validateCmd->callback([&]() {
+        applySchemaCacheDir(argc, argv, schemaCacheDir);
         if (opts.jsonOutput) {
             std::cout << buildJsonValidate().dump(2) << "\n";
         } else {
@@ -108,6 +162,7 @@ int main(int argc, char const *argv[])
         }
     });
     diffCmd->callback([&]() {
+        applySchemaCacheDir(argc, argv, schemaCacheDir);
         if (opts.jsonOutput) {
             std::cout << buildJsonDiff().dump(2) << "\n";
         } else {
@@ -115,6 +170,7 @@ int main(int argc, char const *argv[])
         }
     });
     writeCmd->callback([&]() {
+        applySchemaCacheDir(argc, argv, schemaCacheDir);
         if (opts.jsonOutput) {
             std::cout << buildJsonWrite(writeInput).dump(2) << "\n";
         } else {
