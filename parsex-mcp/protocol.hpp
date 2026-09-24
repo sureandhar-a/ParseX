@@ -28,6 +28,10 @@ inline nlohmann::json makeInvalidRequest(const nlohmann::json& id) {
     return makeProtocolError(id, -32600, "Invalid Request");
 }
 
+inline nlohmann::json makeMethodNotFound(const nlohmann::json& id) {
+    return makeProtocolError(id, -32601, "Method not found");
+}
+
 // Best-effort id recovery from a line that failed to parse as JSON.
 // Returns nullopt when no usable id is present.
 inline std::optional<nlohmann::json> tryRecoverId(const std::string& line) {

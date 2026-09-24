@@ -11,10 +11,18 @@
 
 namespace {
 
-// Placeholder dispatcher for the first transport step.
-// Parses are handed off here; full routing arrives with later pieces.
-// Keeps transport free of protocol logic.
-void dispatchStub(const nlohmann::json& /*message*/) {}
+// Temporary responder proving end-to-end framing before full routing lands.
+// Valid requests get a well-formed Method Not Found reply; notifications
+// (no id) get no reply. Later pieces replace this with real dispatch.
+void dispatchStub(const nlohmann::json& message) {
+    try {
+        if (!message.is_object() || !message.contains("id")) {
+            return;
+        }
+        writeMessage(makeMethodNotFound(message["id"]));
+    } catch (...) {
+    }
+}
 
 }  // namespace
 
