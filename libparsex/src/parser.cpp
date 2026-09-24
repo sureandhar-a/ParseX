@@ -15,6 +15,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -369,6 +370,39 @@ ParsedFile Parser::parseFile(const std::filesystem::path& path) const {
     span.setAttribute("release", file.autosarRelease);
     // Document move re-points parent links at the shared copy (see
     // RawDocument's move operations) — the Write Engine's spans stay valid.
+    file.rawDocument = std::make_shared<RawDocument>(std::move(document));
+    return file;
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): mirrors parseFile() for in-memory bytes.
+ParsedFile Parser::parseBytes(std::span<const std::uint8_t> bytes) const {
+    parsex::telemetry::ScopedSpan span("parser.parseBytes");
+    span.setAttribute("size", static_cast<std::int64_t>(bytes.size()));
+
+    static const std::filesystem::path kBufferPath{"<buffer>"};
+    RawDocument document = [&] {
+        PARSEX_SPAN("parser.load");
+        return loadRawDocumentFromMemory(bytes, kBufferPath);
+    }();
+
+    const std::optional<std::string> schemaFilename = [&] {
+        PARSEX_SPAN("parser.detectRelease");
+        return detectSchemaFilename(document);
+    }();
+    if (!schemaFilename.has_value()) {
+        throw std::runtime_error(
+            "parsex: cannot determine AUTOSAR release for '<buffer>': "
+            "root element has no xsi:schemaLocation");
+    }
+
+    ParsedFile file;
+    file.autosarRelease = resolveRelease(schemaFilename.value());
+    file.sourcePath = kBufferPath;
+    {
+        PARSEX_SPAN("parser.buildModel");
+        buildSubtree(document.root, file);
+    }
+    span.setAttribute("release", file.autosarRelease);
     file.rawDocument = std::make_shared<RawDocument>(std::move(document));
     return file;
 }

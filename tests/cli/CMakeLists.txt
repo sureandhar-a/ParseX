@@ -3,6 +3,7 @@ add_executable(cli_tests
     json_output_test.cpp
     exit_code_test.cpp
     config_test.cpp
+    resource_exhaustion_test.cpp
     approval_test.cpp
 )
 find_package(CLI11 CONFIG REQUIRED)
@@ -30,3 +31,10 @@ add_dependencies(cli_tests parsex-cli)
 
 include(GoogleTest)
 gtest_discover_tests(cli_tests)
+
+# Slow resource checks: nightly/manual only, not per-PR.
+add_test(NAME resource_exhaustion_test
+    COMMAND cli_tests --gtest_filter=ResourceExhaustionTest.*)
+set_tests_properties(resource_exhaustion_test PROPERTIES
+    LABELS "hardening_slow"
+    TIMEOUT 300)

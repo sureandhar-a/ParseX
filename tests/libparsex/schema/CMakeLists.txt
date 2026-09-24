@@ -6,6 +6,7 @@ add_executable(schema_tests
     atomic_write_test.cpp
     cache_atomicity_test.cpp
     resolve_schema_test.cpp
+    schema_missing_test.cpp
     schema_resolution_error_test.cpp
     schema_registry_integration_test.cpp
 )
@@ -29,3 +30,7 @@ target_compile_definitions(
     PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
 )
 gtest_discover_tests(schema_tests)
+
+add_test(NAME hardening_schema_missing
+    COMMAND schema_tests --gtest_filter=SchemaMissingTest.*)
+set_tests_properties(hardening_schema_missing PROPERTIES LABELS "hardening_schema")

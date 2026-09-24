@@ -55,6 +55,8 @@ endif()
 
 option(PARSEX_ENABLE_SANITIZERS "Build with ASan+UBSan instrumentation" OFF)
 
+option(PARSEX_ENABLE_COVERAGE "Build with coverage instrumentation (gcov/llvm-cov)" OFF)
+
 option(PARSEX_ENABLE_TELEMETRY "Compile in ParseX's telemetry instrumentation" ON)
 if(NOT PARSEX_ENABLE_TELEMETRY)
     add_compile_definitions(PARSEX_TELEMETRY_DISABLED)
@@ -71,3 +73,27 @@ if(PARSEX_ENABLE_SANITIZERS)
 endif()
 
 target_link_libraries(libparsex PUBLIC parsex_sanitizers)
+
+# Coverage: opt-in only, never on by default. Uses --coverage (GCC/gcov and
+# Clang both accept it; Clang pairs with llvm-cov/llvm-profdata for reports,
+# GCC with gcovr). Applied to the core library; tools link it transitively.
+add_library(parsex_coverage INTERFACE)
+if(PARSEX_ENABLE_COVERAGE)
+  target_compile_options(parsex_coverage INTERFACE --coverage -O0 -g)
+  target_link_options(parsex_coverage INTERFACE --coverage)
+endif()
+target_link_libraries(libparsex PUBLIC parsex_coverage)
+
+# Coverage report: runs the suite (excluding slow + fuzz loops, which distort
+# line numbers) then produces terminal + HTML output under build/coverage.
+# Toolchain: llvm-cov/llvm-profdata for Clang, gcovr for GCC.
+# One-command local run: scripts/coverage.sh
+find_program(LLVM_COV_EXE NAMES llvm-cov PATHS "$ENV{HOMEBREW_PREFIX}/opt/llvm/bin" /opt/homebrew/opt/llvm/bin)
+find_program(GCOVR_EXE NAMES gcovr)
+add_custom_target(coverage
+  COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -E "hardening_slow|hardening_fuzz|fuzz_parser_smoke|cli_argv_fuzz_smoke|mcp_stdio_frame_fuzz_smoke" || true
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/coverage
+  COMMAND sh -c "if command -v gcovr >/dev/null 2>&1; then gcovr -r ${CMAKE_SOURCE_DIR} --html --html-details -o ${CMAKE_BINARY_DIR}/coverage/index.html --print-summary; echo 'HTML: ${CMAKE_BINARY_DIR}/coverage/index.html'; elif [ -n '${LLVM_COV_EXE}' ]; then echo 'llvm-cov report: run scripts/coverage.sh for full HTML (needs profdata merge)'; ${LLVM_COV_EXE} gcov --help >/dev/null 2>&1 && echo 'llvm-cov available'; else echo 'No coverage tool found (install gcovr or llvm-cov)'; fi"
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+  COMMENT "Run tests (excluding slow/fuzz) and render coverage to build/coverage/index.html"
+  VERBATIM)

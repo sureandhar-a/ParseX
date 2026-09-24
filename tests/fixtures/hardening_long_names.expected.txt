@@ -1,0 +1,4 @@
+release=4.2.2
+clusters=1 ecuInstances=1 frames=0 pdus=0 signals=0 signalGroups=0
+refs=0 uniqueness=0 can=0
+outcome=semantic-pass with 1 parser warning (ecu without controllers)

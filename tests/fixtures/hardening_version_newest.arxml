@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Edge probe: newest supported release boundary. Must resolve to R21-11,
+     not reject. Paired with the oldest-boundary file above. -->
+<AUTOSAR xmlns="http://autosar.org/schema/r4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://autosar.org/schema/r4.0 AUTOSAR_00050.xsd">
+    <AR-PACKAGES>
+        <AR-PACKAGE>
+            <SHORT-NAME>System</SHORT-NAME>
+            <ELEMENTS>
+                <CLUSTER>
+                    <SHORT-NAME>CAN_Cluster</SHORT-NAME>
+                    <CATEGORY>CAN</CATEGORY>
+                    <BAUDRATE>500000</BAUDRATE>
+                </CLUSTER>
+            </ELEMENTS>
+        </AR-PACKAGE>
+    </AR-PACKAGES>
+</AUTOSAR>

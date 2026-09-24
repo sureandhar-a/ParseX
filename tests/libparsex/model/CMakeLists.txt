@@ -2,6 +2,7 @@
 add_executable(model_tests
     defaults_test.cpp
     shared_types_integration_test.cpp
+    contract_sweep_test.cpp
     move_copy_test.cpp
 )
 target_link_libraries(
@@ -17,3 +18,7 @@ target_compile_definitions(
     PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
 )
 gtest_discover_tests(model_tests)
+
+add_test(NAME hardening_schema_contract
+    COMMAND model_tests --gtest_filter=DomainContractTest.*)
+set_tests_properties(hardening_schema_contract PROPERTIES LABELS "hardening_schema")

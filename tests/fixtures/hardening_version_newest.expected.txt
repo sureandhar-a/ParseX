@@ -1,0 +1,4 @@
+release=R21-11
+clusters=1 ecuInstances=0 frames=0 pdus=0 signals=0 signalGroups=0
+refs=0 uniqueness=0 can=0
+outcome=semantic-pass

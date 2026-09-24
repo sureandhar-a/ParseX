@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
+#include <span>
 
 #include <parsex/raw/raw_document.hpp>
 
@@ -39,3 +42,11 @@
 // line/column folded in (captured via a context error handler, so nothing
 // leaks to stderr).
 RawDocument loadRawDocument(const std::filesystem::path& path);
+
+// In-memory variant for fuzzing and tests: parses bytes already in memory
+// without touching the filesystem. displayPath is diagnostic-only (error
+// messages, telemetry labels) — no file is opened. Throws the same
+// ParseError[Syntax] / runtime_error set as loadRawDocument() for malformed
+// input, so fuzz harnesses can treat any exception as "handled gracefully".
+RawDocument loadRawDocumentFromMemory(std::span<const std::uint8_t> bytes,
+                                      const std::filesystem::path& displayPath);

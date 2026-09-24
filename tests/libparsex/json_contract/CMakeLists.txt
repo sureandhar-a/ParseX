@@ -7,6 +7,7 @@ add_executable(json_contract_tests
     payload_schemas_test.cpp
     schema_conformance_test.cpp
     envelope_helper_test.cpp
+    hardening_contract_test.cpp
     json_contract_e2e_test.cpp
 )
 target_link_libraries(
@@ -25,3 +26,15 @@ target_compile_definitions(
     PARSEX_SCHEMAS_DIR="${CMAKE_SOURCE_DIR}/schemas"
 )
 gtest_discover_tests(json_contract_tests)
+
+add_test(NAME contract_envelope_consistency
+    COMMAND json_contract_tests --gtest_filter=EnvelopeConsistencyTest.*)
+set_tests_properties(contract_envelope_consistency PROPERTIES LABELS "hardening_contract")
+
+add_test(NAME contract_strict_validate_nesting
+    COMMAND json_contract_tests --gtest_filter=SpanNestingTest.*)
+set_tests_properties(contract_strict_validate_nesting PROPERTIES LABELS "hardening_contract")
+
+add_test(NAME contract_cli_mcp_version_consistency
+    COMMAND json_contract_tests --gtest_filter=VersionConsistencyTest.*)
+set_tests_properties(contract_cli_mcp_version_consistency PROPERTIES LABELS "hardening_contract")
