@@ -145,7 +145,14 @@ class ToolRegistry {
             ToolDefinition definition;
             definition.name = "write_arxml";
             definition.title = "write_arxml";
-            definition.description = "Preview or apply a safe edit (preview by default)";
+            // Worded so a model with no other context previews first: states
+            // the dry-run default, the apply opt-in, and the confirmation
+            // expectation. Hosts should present confirmation prompts to keep
+            // a human in the loop for higher-risk tools.
+            definition.description =
+                "Edits an ARXML file safely. Previews changes by default without writing "
+                "to disk. Show the user the preview and get explicit confirmation, then "
+                "retry with apply:true to write.";
             definition.inputSchema = writeInputSchema();
             definition.outputSchema = writeOutputSchema();
             definition.annotations = writeAnnotations;

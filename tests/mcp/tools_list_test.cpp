@@ -43,3 +43,14 @@ TEST(WriteAnnotations, GuardedFromSilentRegression) {
     ASSERT_EQ(listed["tools"].size(), 4);
     EXPECT_EQ(listed["tools"][3]["annotations"], write->annotations);
 }
+
+TEST(WriteDescription, StatesPreviewDefaultAndConfirmation) {
+    ToolRegistry registry = ToolRegistry::withSchemas();
+    const ToolDefinition* write = registry.find("write_arxml");
+    ASSERT_NE(write, nullptr);
+    const std::string text = write->description;
+    EXPECT_NE(text.find("Preview"), std::string::npos);
+    EXPECT_NE(text.find("apply:true"), std::string::npos);
+    EXPECT_NE(text.find("confirmation"), std::string::npos);
+    EXPECT_LT(text.size(), 400);
+}
