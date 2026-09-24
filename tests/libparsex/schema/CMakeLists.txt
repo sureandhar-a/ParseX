@@ -6,6 +6,7 @@ add_executable(schema_tests
     atomic_write_test.cpp
     cache_atomicity_test.cpp
     resolve_schema_test.cpp
+    schema_missing_test.cpp
     schema_resolution_error_test.cpp
     schema_registry_integration_test.cpp
 )
