@@ -8,6 +8,7 @@
 #include <string>
 
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 
 namespace fs = std::filesystem;
 
@@ -84,6 +85,39 @@ std::string runWriteHuman() {
     return captureStdout("\"" + cliBinary().string() + "\" write --input \"" + (fixturesDir() / "schema_valid.arxml").string() + "\" --output /tmp/parsex_approval_write.arxml");
 }
 
+std::string runParseJson() {
+    return captureStdout("\"" + cliBinary().string() + "\" --json parse --input \"" + (fixturesDir() / "schema_valid.arxml").string() + "\"");
+}
+
+std::string runValidateJson() {
+    return captureStdout("\"" + cliBinary().string() + "\" --json validate --input \"" + (fixturesDir() / "schema_valid.arxml").string() + "\"");
+}
+
+std::string runDiffJson() {
+    return captureStdout("\"" + cliBinary().string() + "\" --json diff --base \"" + (fixturesDir() / "schema_valid.arxml").string() + "\" --target \"" + (fixturesDir() / "schema_valid.arxml").string() + "\"");
+}
+
+std::string runWriteJson() {
+    return captureStdout("\"" + cliBinary().string() + "\" --json write --input \"" + (fixturesDir() / "schema_valid.arxml").string() + "\" --output /tmp/parsex_approval_write.arxml");
+}
+
+std::string normalizeJsonForApproval(std::string s) {
+    // First apply path normalization (fixture dir).
+    s = normalizeForApproval(std::move(s));
+    // Then use JSON-aware normalization: parse and re-dump with stable 2-space indent.
+    // This avoids false failures from key-ordering differences (e.g. nlohmann insertion order).
+    // If ApprovalTests' JSON comparator is available, it would do similar; we do manual.
+    try {
+        auto j = nlohmann::json::parse(s);
+        // Re-dump with sorted keys? nlohmann doesn't sort, but re-parsing then dumping
+        // preserves the file's key order which is deterministic from wrapEnvelope.
+        // To be extra stable, we output with dump(2) which is consistent.
+        return j.dump(2) + "\n";
+    } catch (...) {
+        return s;
+    }
+}
+
 }  // namespace
 
 // PAR-228: golden-file (approval) tests over real subcommand invocations.
@@ -107,5 +141,30 @@ TEST(ApprovalTests, DiffHuman) {
 
 TEST(ApprovalTests, WriteHuman) {
     auto output = normalizeForApproval(runWriteHuman());
+    ApprovalTests::Approvals::verify(output);
+}
+
+// PAR-229: golden-file coverage for --json output alongside human output.
+// Both modes are tested for all four subcommands; a deliberate regression
+// (temporarily break one field) is caught by the approval diff before revert.
+// JSON-wise we use nlohmann::json parse+dumps to avoid key-ordering false failures.
+
+TEST(ApprovalTests, ParseJson) {
+    auto output = normalizeJsonForApproval(runParseJson());
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(ApprovalTests, ValidateJson) {
+    auto output = normalizeJsonForApproval(runValidateJson());
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(ApprovalTests, DiffJson) {
+    auto output = normalizeJsonForApproval(runDiffJson());
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(ApprovalTests, WriteJson) {
+    auto output = normalizeJsonForApproval(runWriteJson());
     ApprovalTests::Approvals::verify(output);
 }
