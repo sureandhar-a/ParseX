@@ -6,6 +6,7 @@ add_executable(write_tests
     file_output_test.cpp
     pretty_print_test.cpp
     roundtrip_test.cpp
+    roundtrip_idempotent_test.cpp
     fixture_sweep_test.cpp
     limitation_test.cpp
     facade_test.cpp
