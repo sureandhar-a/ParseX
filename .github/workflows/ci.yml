@@ -59,6 +59,8 @@ jobs:
           run: cmake --build build/debug --parallel
         - name: Test
           run: ctest --test-dir build/debug --output-on-failure
+        - name: Contract hardening
+          run: ctest --test-dir build/debug --output-on-failure -L hardening_contract
 
         - name: Configure with sanitizers
           if: runner.os != 'Windows'
