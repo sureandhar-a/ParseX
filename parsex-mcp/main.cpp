@@ -15,13 +15,39 @@
 namespace {
 
 // Routes one validated message. Discovery is optional: every method works
-// whether or not the client asked for identity first.
+// whether or not the client asked for identity first. Version is checked
+// once here so every method shares the same path.
 void dispatchMessage(const nlohmann::json& message, const ToolRegistry& registry) {
     try {
-        if (!message.is_object() || !message.contains("id")) {
+        if (!message.is_object()) {
             return;
         }
-        const nlohmann::json id = message["id"];
+        // Notifications without id get no response, but version still applies
+        // when present. Use null id for error paths that lack one.
+        const bool hasId = message.contains("id");
+        const nlohmann::json id = hasId ? message["id"] : nlohmann::json(nullptr);
+        // Stateless version check on every request.
+        try {
+            auto version = extractProtocolVersion(message);
+            if (version.has_value() && !isSupportedVersion(*version)) {
+                if (!hasId) {
+                    return;
+                }
+                nlohmann::json response;
+                response["jsonrpc"] = "2.0";
+                response["id"] = id;
+                response["error"] = {{"code", -32600},
+                                     {"message",
+                                      "Unsupported protocol version: " + *version +
+                                          ". Supported: 2026-07-28"}};
+                writeMessage(response);
+                return;
+            }
+        } catch (...) {
+        }
+        if (!hasId) {
+            return;
+        }
         std::string method;
         nlohmann::json params = nlohmann::json::object();
         try {

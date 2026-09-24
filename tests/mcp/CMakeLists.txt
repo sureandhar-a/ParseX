@@ -8,6 +8,7 @@ add_executable(mcp_tests
     dispatch_test.cpp
     parse_tools_test.cpp
     write_tools_test.cpp
+    version_test.cpp
 )
 
 find_package(nlohmann_json CONFIG REQUIRED)

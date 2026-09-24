@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -21,6 +22,32 @@ inline constexpr std::string_view kServerName = "parsex-mcp";
 
 inline std::vector<std::string> supportedVersions() {
     return {std::string(kProtocolVersion)};
+}
+
+inline std::optional<std::string> extractProtocolVersion(const nlohmann::json& message) {
+    try {
+        if (!message.is_object() || !message.contains("_meta") ||
+            !message["_meta"].is_object()) {
+            return std::nullopt;
+        }
+        const auto& meta = message["_meta"];
+        auto it = meta.find("io.modelcontextprotocol/protocolVersion");
+        if (it == meta.end() || !it->is_string()) {
+            return std::nullopt;
+        }
+        return it->get<std::string>();
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
+inline bool isSupportedVersion(const std::string& version) {
+    for (const auto& supported : supportedVersions()) {
+        if (version == supported) {
+            return true;
+        }
+    }
+    return false;
 }
 
 inline nlohmann::json buildDiscoverResult() {
