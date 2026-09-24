@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 
 #include "protocol.hpp"
+#include "server.hpp"
 #include "transport.hpp"
 
 // Convention: writeMessage() is the only function allowed to write to
@@ -11,15 +12,31 @@
 
 namespace {
 
-// Temporary responder proving end-to-end framing before full routing lands.
-// Valid requests get a well-formed Method Not Found reply; notifications
-// (no id) get no reply. Later pieces replace this with real dispatch.
+// Routes one validated message. Discovery is optional: every method works
+// whether or not the client asked for identity first. Unknown methods get a
+// well-formed not-found reply so pipe tests can prove framing.
 void dispatchStub(const nlohmann::json& message) {
     try {
         if (!message.is_object() || !message.contains("id")) {
             return;
         }
-        writeMessage(makeMethodNotFound(message["id"]));
+        const nlohmann::json id = message["id"];
+        std::string method;
+        try {
+            if (message.contains("method") && message["method"].is_string()) {
+                method = message["method"].get<std::string>();
+            }
+        } catch (...) {
+        }
+        if (method == "server/discover") {
+            nlohmann::json response;
+            response["jsonrpc"] = "2.0";
+            response["id"] = id;
+            response["result"] = buildDiscoverResult();
+            writeMessage(response);
+            return;
+        }
+        writeMessage(makeMethodNotFound(id));
     } catch (...) {
     }
 }
