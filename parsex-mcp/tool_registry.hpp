@@ -10,6 +10,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "tool_schemas.hpp"
+
 // Single definition point for every tool, read by both listing and calling,
 // so a tool is declared once and used everywhere.
 
@@ -74,6 +76,52 @@ class ToolRegistry {
             definition.title = name;
             definition.description = "";
             definition.inputSchema = {{"type", "object"}};
+            definition.handler = [](const nlohmann::json&) { return nlohmann::json::object(); };
+            registry.registerTool(std::move(definition));
+        }
+        return registry;
+    }
+
+    // Full schemas for all four tools, reusing the report shapes.
+    static ToolRegistry withSchemas() {
+        ToolRegistry registry;
+        {
+            ToolDefinition definition;
+            definition.name = "parse_arxml";
+            definition.title = "parse_arxml";
+            definition.description = "Parse an ARXML file and report its structure";
+            definition.inputSchema = parseInputSchema();
+            definition.outputSchema = parseOutputSchema();
+            definition.handler = [](const nlohmann::json&) { return nlohmann::json::object(); };
+            registry.registerTool(std::move(definition));
+        }
+        {
+            ToolDefinition definition;
+            definition.name = "validate_arxml";
+            definition.title = "validate_arxml";
+            definition.description = "Validate an ARXML file";
+            definition.inputSchema = validateInputSchema();
+            definition.outputSchema = validateOutputSchema();
+            definition.handler = [](const nlohmann::json&) { return nlohmann::json::object(); };
+            registry.registerTool(std::move(definition));
+        }
+        {
+            ToolDefinition definition;
+            definition.name = "diff_arxml";
+            definition.title = "diff_arxml";
+            definition.description = "Diff two ARXML files";
+            definition.inputSchema = diffInputSchema();
+            definition.outputSchema = diffOutputSchema();
+            definition.handler = [](const nlohmann::json&) { return nlohmann::json::object(); };
+            registry.registerTool(std::move(definition));
+        }
+        {
+            ToolDefinition definition;
+            definition.name = "write_arxml";
+            definition.title = "write_arxml";
+            definition.description = "Preview or apply a safe edit (preview by default)";
+            definition.inputSchema = writeInputSchema();
+            definition.outputSchema = writeOutputSchema();
             definition.handler = [](const nlohmann::json&) { return nlohmann::json::object(); };
             registry.registerTool(std::move(definition));
         }
