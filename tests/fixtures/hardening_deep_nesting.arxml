@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Edge probe: deepest practical package nesting (12 levels). Exercises the recursive package walk and span tracking without hitting schema limits. Kept at 12 to stay readable while still beyond any hand-written fixture. -->
+<AUTOSAR xmlns="http://autosar.org/schema/r4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://autosar.org/schema/r4.0 AUTOSAR_4-2-2.xsd">
+    <AR-PACKAGES>
+        <AR-PACKAGE><SHORT-NAME>L01</SHORT-NAME>
+            <AR-PACKAGES>
+            <AR-PACKAGE><SHORT-NAME>L02</SHORT-NAME>
+                <AR-PACKAGES>
+                <AR-PACKAGE><SHORT-NAME>L03</SHORT-NAME>
+                    <AR-PACKAGES>
+                    <AR-PACKAGE><SHORT-NAME>L04</SHORT-NAME>
+                        <AR-PACKAGES>
+                        <AR-PACKAGE><SHORT-NAME>L05</SHORT-NAME>
+                            <AR-PACKAGES>
+                            <AR-PACKAGE><SHORT-NAME>L06</SHORT-NAME>
+                                <AR-PACKAGES>
+                                <AR-PACKAGE><SHORT-NAME>L07</SHORT-NAME>
+                                    <AR-PACKAGES>
+                                    <AR-PACKAGE><SHORT-NAME>L08</SHORT-NAME>
+                                        <AR-PACKAGES>
+                                        <AR-PACKAGE><SHORT-NAME>L09</SHORT-NAME>
+                                            <AR-PACKAGES>
+                                            <AR-PACKAGE><SHORT-NAME>L10</SHORT-NAME>
+                                                <AR-PACKAGES>
+                                                <AR-PACKAGE><SHORT-NAME>L11</SHORT-NAME>
+                                                    <AR-PACKAGES>
+                                                    <AR-PACKAGE><SHORT-NAME>L12</SHORT-NAME>
+                                                        <ELEMENTS>
+                                                            <CLUSTER><SHORT-NAME>DeepCluster</SHORT-NAME><CATEGORY>CAN</CATEGORY><BAUDRATE>500000</BAUDRATE></CLUSTER>
+                                                        </ELEMENTS>
+                                                    </AR-PACKAGE>
+                                                    </AR-PACKAGES>
+                                                </AR-PACKAGE>
+                                                </AR-PACKAGES>
+                                            </AR-PACKAGE>
+                                            </AR-PACKAGES>
+                                        </AR-PACKAGE>
+                                        </AR-PACKAGES>
+                                    </AR-PACKAGE>
+                                    </AR-PACKAGES>
+                                </AR-PACKAGE>
+                                </AR-PACKAGES>
+                            </AR-PACKAGE>
+                            </AR-PACKAGES>
+                        </AR-PACKAGE>
+                        </AR-PACKAGES>
+                    </AR-PACKAGE>
+                    </AR-PACKAGES>
+                </AR-PACKAGE>
+                </AR-PACKAGES>
+            </AR-PACKAGE>
+            </AR-PACKAGES>
+        </AR-PACKAGE>
+    </AR-PACKAGES>
+</AUTOSAR>

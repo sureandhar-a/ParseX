@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Edge probe: empty-but-well-formed input. Parses cleanly with zero domain
+     objects. Fuzzers rarely emit schema-valid empties, so this locks in the
+     "no content is not a crash" contract for the validation path. -->
+<AUTOSAR xmlns="http://autosar.org/schema/r4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://autosar.org/schema/r4.0 AUTOSAR_4-2-2.xsd">
+    <AR-PACKAGES>
+        <AR-PACKAGE>
+            <SHORT-NAME>Empty</SHORT-NAME>
+            <ELEMENTS/>
+        </AR-PACKAGE>
+    </AR-PACKAGES>
+</AUTOSAR>
