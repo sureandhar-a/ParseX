@@ -49,6 +49,14 @@ class ToolRegistry {
         return it == tools_.end() ? nullptr : &it->second;
     }
 
+    void setHandler(const std::string& name,
+                    std::function<nlohmann::json(const nlohmann::json&)> handler) {
+        auto it = tools_.find(name);
+        if (it != tools_.end()) {
+            it->second.handler = std::move(handler);
+        }
+    }
+
     // Stable registration order for deterministic listing.
     std::vector<const ToolDefinition*> ordered() const {
         std::vector<const ToolDefinition*> out;

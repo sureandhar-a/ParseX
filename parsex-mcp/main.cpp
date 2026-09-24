@@ -6,6 +6,7 @@
 #include "dispatch.hpp"
 #include "protocol.hpp"
 #include "server.hpp"
+#include "tools.hpp"
 #include "transport.hpp"
 
 // Convention: writeMessage() is the only function allowed to write to
@@ -70,7 +71,8 @@ void dispatchMessage(const nlohmann::json& message, const ToolRegistry& registry
 }  // namespace
 
 int main() {
-    const ToolRegistry registry = ToolRegistry::withSchemas();
+    ToolRegistry registry = ToolRegistry::withSchemas();
+    registry.setHandler("parse_arxml", parseTool);
     std::string line;
     while (std::getline(std::cin, line)) {
         // Empty lines carry no message; skip without responding.
