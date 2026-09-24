@@ -39,13 +39,28 @@ void dispatchMessage(const nlohmann::json& message, const ToolRegistry& registry
                 response["error"] = {{"code", -32600},
                                      {"message",
                                       "Unsupported protocol version: " + *version +
-                                          ". Supported: 2026-07-28"}};
+                                          ". Supported versions: 2026-07-28"},
+                                     {"data",
+                                      {{"supportedVersions",
+                                        nlohmann::json::array({"2026-07-28"})}}}};
                 writeMessage(response);
                 return;
             }
         } catch (...) {
         }
         if (!hasId) {
+            // Legacy handshake uses a request with id, so notifications fall
+            // through here with no response.
+            try {
+                std::string methodCheck;
+                if (message.contains("method") && message["method"].is_string()) {
+                    methodCheck = message["method"].get<std::string>();
+                }
+                if (methodCheck == "initialize") {
+                    return;
+                }
+            } catch (...) {
+            }
             return;
         }
         std::string method;
@@ -87,6 +102,19 @@ void dispatchMessage(const nlohmann::json& message, const ToolRegistry& registry
                 writeMessage(dispatchToolsCall(id, params, registry));
             } catch (...) {
             }
+            return;
+        }
+        if (method == "initialize") {
+            nlohmann::json response;
+            response["jsonrpc"] = "2.0";
+            response["id"] = id;
+            response["error"] = {
+                {"code", -32600},
+                {"message",
+                 "Legacy initialize handshake is not supported. This server requires protocol "
+                 "version 2026-07-28 with per-request _meta."},
+                {"data", {{"supportedVersions", nlohmann::json::array({"2026-07-28"})}}}};
+            writeMessage(response);
             return;
         }
         writeMessage(makeMethodNotFound(id));
