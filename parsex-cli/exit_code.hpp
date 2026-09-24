@@ -1,5 +1,17 @@
 #pragma once
 
+#include <exception>
+#include <filesystem>
+#include <ios>
+#include <stdexcept>
+
+#include "CLI/CLI.hpp"
+#include "parsex/parser/parse_error.hpp"
+#include "parsex/parser/project_error.hpp"
+#include "parsex/parser/release_error.hpp"
+#include "parsex/schema/schema_resolution_error.hpp"
+#include "parsex/write/write_engine.hpp"
+
 // PAR-216: small, documented process exit-code convention for parsex-cli,
 // adapted from BSD sysexits.h rather than inventing bespoke numbering so
 // scripts get conventional, greppable statuses.
@@ -25,3 +37,45 @@ enum class ExitCode : int {
     IoErr = 74,
     Software = 70
 };
+
+namespace parsex::cli {
+
+// PAR-217: inventory of libparsex throws (PAR-65/PAR-92/PAR-138):
+//   ParseError(Io) -> IoErr; ParseError(Syntax) -> DataErr
+//   UnsupportedReleaseError, DanglingFileReferenceError, WriteError -> DataErr
+//   SchemaResolutionError(Missing) -> IoErr; (Corrupt/Unsupported) -> DataErr
+//   std::filesystem::filesystem_error, std::ios_base::failure -> IoErr
+//   CLI::ParseError -> Usage; anything else -> Software.
+// Ordered most-specific-first when used as a catch chain; classify() mirrors
+// that order with dynamic_casts.
+inline ExitCode classify(const std::exception& ex) {
+    if (dynamic_cast<const CLI::ParseError*>(&ex) != nullptr) {
+        return ExitCode::Usage;
+    }
+    if (const auto* parseErr = dynamic_cast<const ParseError*>(&ex)) {
+        return parseErr->reason() == ParseErrorReason::Io ? ExitCode::IoErr : ExitCode::DataErr;
+    }
+    if (const auto* schemaErr = dynamic_cast<const SchemaResolutionError*>(&ex)) {
+        return schemaErr->reason() == SchemaResolutionReason::SchemaFileMissing
+                   ? ExitCode::IoErr
+                   : ExitCode::DataErr;
+    }
+    if (dynamic_cast<const UnsupportedReleaseError*>(&ex) != nullptr) {
+        return ExitCode::DataErr;
+    }
+    if (dynamic_cast<const DanglingFileReferenceError*>(&ex) != nullptr) {
+        return ExitCode::DataErr;
+    }
+    if (dynamic_cast<const WriteError*>(&ex) != nullptr) {
+        return ExitCode::DataErr;
+    }
+    if (dynamic_cast<const std::filesystem::filesystem_error*>(&ex) != nullptr) {
+        return ExitCode::IoErr;
+    }
+    if (dynamic_cast<const std::ios_base::failure*>(&ex) != nullptr) {
+        return ExitCode::IoErr;
+    }
+    return ExitCode::Software;
+}
+
+}  // namespace parsex::cli

@@ -1,11 +1,14 @@
 add_executable(cli_tests
     color_test.cpp
     json_output_test.cpp
+    exit_code_test.cpp
 )
+find_package(CLI11 CONFIG REQUIRED)
 target_link_libraries(
     cli_tests
     PRIVATE
     libparsex
+    CLI11::CLI11
     GTest::gtest
     GTest::gtest_main
 )
