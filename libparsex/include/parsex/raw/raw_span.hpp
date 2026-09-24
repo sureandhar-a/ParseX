@@ -12,6 +12,6 @@ struct RawSpan
 
     bool isValid() const
     {
-        return startOffset > endOffset;
+        return endOffset > startOffset;
     }
 };

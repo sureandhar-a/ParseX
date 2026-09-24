@@ -3,13 +3,13 @@
 #include <parsex/raw/raw_span.hpp>
 
 TEST(RawSpanTest, IsValidReturnsTrueWhenStartExceedsEnd) {
-    const RawSpan span{.startOffset = 10, .endOffset = 5, .lineNumber = 7};
+    const RawSpan span{.startOffset = 5, .endOffset = 10, .lineNumber = 7};
 
     EXPECT_TRUE(span.isValid());
 }
 
 TEST(RawSpanTest, IsValidReturnsFalseWhenStartDoesNotExceedEnd) {
-    const RawSpan span{.startOffset = 5, .endOffset = 10, .lineNumber = 7};
+    const RawSpan span{.startOffset = 10, .endOffset = 5, .lineNumber = 7};
 
     EXPECT_FALSE(span.isValid());
 }

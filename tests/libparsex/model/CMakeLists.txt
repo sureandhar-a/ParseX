@@ -2,6 +2,7 @@
 add_executable(model_tests
     defaults_test.cpp
     shared_types_integration_test.cpp
+    contract_sweep_test.cpp
     move_copy_test.cpp
 )
 target_link_libraries(
