@@ -604,8 +604,11 @@ void relinkParents(RawNode& node) {
 
 }  // namespace
 
-RawDocument loadRawDocument(const std::filesystem::path& path) {
-    const std::string bytes = readFileBytes(path);
+RawDocument loadRawDocumentFromMemory(std::span<const std::uint8_t> input,
+                                        const std::filesystem::path& displayPath) {
+    // Copy into std::string for the raw-byte scanner (which indexes bytes).
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): byte copy into char storage.
+    const std::string bytes(reinterpret_cast<const char*>(input.data()), input.size());
 
     LoaderState state;
     state.fileBytes = &bytes;
@@ -614,7 +617,7 @@ RawDocument loadRawDocument(const std::filesystem::path& path) {
     // Diagnostic-only label for libxml2 messages (not a file open — the bytes
     // are already in memory). path::c_str() is wchar_t on Windows, so copy
     // the u8string() code units byte-for-byte.
-    const auto utf8Path = path.u8string();
+    const auto utf8Path = displayPath.u8string();
     const std::string narrowPath{utf8Path.begin(), utf8Path.end()};
 
     ParserCtxtPtr ctxt(xmlNewParserCtxt());
@@ -642,7 +645,7 @@ RawDocument loadRawDocument(const std::filesystem::path& path) {
                                       nullptr, XML_PARSE_NONET);
     xmlFreeDoc(doc);  // null with a custom SAX handler; freed defensively
     if (ctxt->wellFormed != 1) {
-        throw ParseError(ParseErrorReason::Syntax, path, syntaxDetail(errorCapture));
+        throw ParseError(ParseErrorReason::Syntax, displayPath, syntaxDetail(errorCapture));
     }
     if (state.root == nullptr) {
         throw std::runtime_error("parsex: no document element in: " + narrowPath);
@@ -652,4 +655,12 @@ RawDocument loadRawDocument(const std::filesystem::path& path) {
     document.root = std::move(*state.root);
     relinkParents(document.root);
     return document;
+}
+
+RawDocument loadRawDocument(const std::filesystem::path& path) {
+    const std::string bytes = readFileBytes(path);
+    // Reuse the in-memory path so file and buffer inputs share one parser.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): byte reinterpret for span view.
+    const auto* asBytes = reinterpret_cast<const std::uint8_t*>(bytes.data());
+    return loadRawDocumentFromMemory({asBytes, bytes.size()}, path);
 }

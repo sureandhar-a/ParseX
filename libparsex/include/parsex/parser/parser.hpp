@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
+#include <span>
 #include <vector>
 
 #include <parsex/model/parsed_file.hpp>
@@ -35,6 +38,11 @@ class Parser {
 public:
     Parser() = default;
     ParsedFile parseFile(const std::filesystem::path& path) const;
+    // In-memory entry for fuzzing and tests: same pipeline as parseFile()
+    // but from bytes already in memory, with no filesystem access.
+    // sourcePath is set to "<buffer>" for diagnostics. Any failure throws
+    // the same types as parseFile() — callers treat exceptions as handled.
+    ParsedFile parseBytes(std::span<const std::uint8_t> bytes) const;
     // Parses a whole project and collects the results into ParsedProject.files,
     // in deterministic order. ExplicitList parses exactly entryPoints;
     // DirectoryScan adds every .arxml sibling (case-insensitive, single
