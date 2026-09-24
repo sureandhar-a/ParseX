@@ -30,3 +30,16 @@ TEST(ToolListing, AcceptsCursorWithoutError) {
     nlohmann::json withoutCursor = buildToolsListResult(registry);
     EXPECT_EQ(withCursor, withoutCursor);
 }
+
+TEST(WriteAnnotations, GuardedFromSilentRegression) {
+    ToolRegistry registry = ToolRegistry::withSchemas();
+    const ToolDefinition* write = registry.find("write_arxml");
+    ASSERT_NE(write, nullptr);
+    EXPECT_EQ(write->annotations["readOnlyHint"], false);
+    EXPECT_EQ(write->annotations["destructiveHint"], true);
+    EXPECT_EQ(write->annotations["idempotentHint"], false);
+    EXPECT_EQ(write->annotations["openWorldHint"], false);
+    nlohmann::json listed = buildToolsListResult(registry);
+    ASSERT_EQ(listed["tools"].size(), 4);
+    EXPECT_EQ(listed["tools"][3]["annotations"], write->annotations);
+}

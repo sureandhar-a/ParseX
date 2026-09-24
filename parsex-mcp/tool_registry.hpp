@@ -98,6 +98,11 @@ class ToolRegistry {
                                                     {"destructiveHint", false},
                                                     {"idempotentHint", true},
                                                     {"openWorldHint", false}};
+        // The write tool is the one higher-risk entry: it can mutate a file,
+        // so it is marked destructive and non-read-only. Idempotent stays
+        // false as the conservative choice — the tool runs in preview or
+        // apply mode and an edit such as an insert would duplicate on a
+        // second apply, so repeat calls are not safely repeatable.
         const nlohmann::json writeAnnotations = {{"readOnlyHint", false},
                                                  {"destructiveHint", true},
                                                  {"idempotentHint", false},
