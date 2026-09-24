@@ -18,3 +18,7 @@ target_compile_definitions(
     PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
 )
 gtest_discover_tests(model_tests)
+
+add_test(NAME hardening_schema_contract
+    COMMAND model_tests --gtest_filter=DomainContractTest.*)
+set_tests_properties(hardening_schema_contract PROPERTIES LABELS "hardening_schema")

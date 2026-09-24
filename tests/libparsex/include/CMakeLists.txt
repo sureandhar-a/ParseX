@@ -20,3 +20,7 @@ target_link_libraries(
 )
 # Register gtests with CTest so they can be run via ctest.
 gtest_discover_tests(include_tests)
+
+add_test(NAME hardening_schema_span
+    COMMAND include_tests --gtest_filter=RawSpanTest.*)
+set_tests_properties(hardening_schema_span PROPERTIES LABELS "hardening_schema")

@@ -28,3 +28,9 @@ target_compile_definitions(
 )
 
 gtest_discover_tests(parser_tests)
+
+# Focused group for local debugging: ctest -L hardening_schema.
+# Pure local file/logic checks — no network, no external services, deterministic.
+add_test(NAME hardening_schema_version_boundary
+    COMMAND parser_tests --gtest_filter=VersionBoundaryTest.*:ReleaseDetectorTest.*)
+set_tests_properties(hardening_schema_version_boundary PROPERTIES LABELS "hardening_schema")

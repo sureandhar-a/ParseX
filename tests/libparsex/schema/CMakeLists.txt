@@ -30,3 +30,7 @@ target_compile_definitions(
     PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
 )
 gtest_discover_tests(schema_tests)
+
+add_test(NAME hardening_schema_missing
+    COMMAND schema_tests --gtest_filter=SchemaMissingTest.*)
+set_tests_properties(hardening_schema_missing PROPERTIES LABELS "hardening_schema")
