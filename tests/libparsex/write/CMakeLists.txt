@@ -8,6 +8,7 @@ add_executable(write_tests
     roundtrip_test.cpp
     roundtrip_idempotent_test.cpp
     roundtrip_random_test.cpp
+    reconverge_test.cpp
     fixture_sweep_test.cpp
     limitation_test.cpp
     facade_test.cpp
