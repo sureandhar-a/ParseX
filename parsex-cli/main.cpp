@@ -11,6 +11,9 @@
 #include "parsex/parser/parser.hpp"
 #include "parsex/schema/cache_layout.hpp"
 #include "parsex/schema/schema_registry.hpp"
+#include "parsex/telemetry/scoped_span.hpp"
+#include "parsex/telemetry/telemetry_config.hpp"
+#include "parsex/telemetry/telemetry_context.hpp"
 #include "parsex/validator/validator.hpp"
 #include "parsex/validator/validation_result.hpp"
 #include "parsex/write/write_engine.hpp"
@@ -185,10 +188,13 @@ int main(int argc, char const *argv[])
     struct CliOptions {
         bool jsonOutput{false};
         bool noColor{false};
+        bool trace{false};
     };
     CliOptions opts;
     app.add_flag("--json", opts.jsonOutput, "Emit machine-readable JSON instead of human-readable text");
     app.add_flag("--no-color", opts.noColor, "Disable colored output");
+    // PAR-227: top-level --trace flag enabling telemetry span emission per PAR-178.
+    app.add_flag("--trace", opts.trace, "Emit telemetryReport JSON to stderr");
     // NOTE (PAR-212): CLI11 resolves `--json` before the subcommand
     // (`parsex --json parse ...`). `parsex parse --json ...` is rejected
     // unless each subcommand re-declares the flag or fallthrough is enabled;
@@ -233,52 +239,80 @@ int main(int argc, char const *argv[])
     diffCmd->add_option("--target", diffTarget, "Target ARXML file")->required()->check(CLI::ExistingFile);
     parseCmd->callback([&]() {
         applySchemaCacheDir(argc, argv, schemaCacheDir);
-        Parser parser;
-        ParsedFile pf = parser.parseFile(std::filesystem::path(parseInput));
+        parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
+        if (opts.trace) {
+            parsex::telemetry::TelemetryContext::reset();
+        }
+        ParsedFile pf;
+        std::exception_ptr ep;
+        {
+            parsex::telemetry::ScopedSpan span("parsex-cli.parse");
+            try {
+                Parser parser;
+                pf = parser.parseFile(std::filesystem::path(parseInput));
+            } catch (...) {
+                ep = std::current_exception();
+            }
+        }
+        if (ep) {
+            if (opts.trace) {
+                std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
+            }
+            std::rethrow_exception(ep);
+        }
         if (opts.jsonOutput) {
             std::cout << buildJsonParse(pf).dump(2) << "\n";
         } else {
             std::cout << formatHumanParse(pf);
         }
+        if (opts.trace) {
+            std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
+        }
     });
     validateCmd->callback([&]() {
         applySchemaCacheDir(argc, argv, schemaCacheDir);
+        parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
+        if (opts.trace) {
+            parsex::telemetry::TelemetryContext::reset();
+        }
         Parser parser;
         ParsedProject project;
         ValidationResult result;
-        // PAR-225: --strict sequences Parser before Validator; both paths treat
-        // a hard parse failure as a validation finding (not a process error),
-        // but strict mode also fails the verdict on warnings via overallPassed.
-        try {
-            auto pf = parser.parseFile(std::filesystem::path(validateInput));
-            project.files.push_back(std::move(pf));
-        } catch (const std::exception& ex) {
-            result.errors.push_back({Severity::Error, "parse.failed", ex.what()});
-            if (opts.jsonOutput) {
-                std::cout << buildJsonValidate(result, validateStrict).dump(2) << "\n";
-            } else {
-                std::cout << formatHumanValidate(result, validateStrict);
+        bool strict = validateStrict;
+        bool parsedOk = false;
+        {
+            parsex::telemetry::ScopedSpan span("parsex-cli.validate");
+            try {
+                auto pf = parser.parseFile(std::filesystem::path(validateInput));
+                project.files.push_back(std::move(pf));
+                parsedOk = true;
+            } catch (const std::exception& ex) {
+                result.errors.push_back({Severity::Error, "parse.failed", ex.what()});
+                parsedOk = false;
             }
-            return;
-        }
-        // Resolve shared schema for the first file's release and run full validation.
-        try {
-            const std::string& release = project.files.front().autosarRelease;
-            if (!release.empty()) {
-                auto resolved = resolveSchema(release);
-                Validator validator;
-                auto combined = validator.validateAll(project, resolved.schema.schemaHandle.get());
-                result.merge(combined);
-            } else {
-                result.errors.push_back({Severity::Error, "schema.no_release", "cannot determine AUTOSAR release for validation"});
+            if (parsedOk) {
+                try {
+                    const std::string& release = project.files.front().autosarRelease;
+                    if (!release.empty()) {
+                        auto resolved = resolveSchema(release);
+                        Validator validator;
+                        auto combined = validator.validateAll(project, resolved.schema.schemaHandle.get());
+                        result.merge(combined);
+                    } else {
+                        result.errors.push_back({Severity::Error, "schema.no_release", "cannot determine AUTOSAR release for validation"});
+                    }
+                } catch (const std::exception& ex) {
+                    result.errors.push_back({Severity::Error, "validator.error", ex.what()});
+                }
             }
-        } catch (const std::exception& ex) {
-            result.errors.push_back({Severity::Error, "validator.error", ex.what()});
         }
         if (opts.jsonOutput) {
-            std::cout << buildJsonValidate(result, validateStrict).dump(2) << "\n";
+            std::cout << buildJsonValidate(result, strict).dump(2) << "\n";
         } else {
-            std::cout << formatHumanValidate(result, validateStrict);
+            std::cout << formatHumanValidate(result, strict);
+        }
+        if (opts.trace) {
+            std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
         }
         // Validations findings do not change the process exit code — always 0
         // when the tool ran; pass/fail lives in payload.passed. Only malformed
@@ -286,52 +320,88 @@ int main(int argc, char const *argv[])
     });
     diffCmd->callback([&]() {
         applySchemaCacheDir(argc, argv, schemaCacheDir);
-        Parser parser;
-        ParsedProject oldProject;
-        ParsedProject newProject;
-        oldProject.files.push_back(parser.parseFile(std::filesystem::path(diffBase)));
-        newProject.files.push_back(parser.parseFile(std::filesystem::path(diffTarget)));
-        DiffEngine engine;
-        DiffReport report = engine.diff(oldProject, newProject);
+        parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
+        if (opts.trace) {
+            parsex::telemetry::TelemetryContext::reset();
+        }
+        DiffReport report;
+        std::exception_ptr ep;
+        {
+            parsex::telemetry::ScopedSpan span("parsex-cli.diff");
+            try {
+                Parser parser;
+                ParsedProject oldProject;
+                ParsedProject newProject;
+                oldProject.files.push_back(parser.parseFile(std::filesystem::path(diffBase)));
+                newProject.files.push_back(parser.parseFile(std::filesystem::path(diffTarget)));
+                DiffEngine engine;
+                report = engine.diff(oldProject, newProject);
+            } catch (...) {
+                ep = std::current_exception();
+            }
+        }
+        if (ep) {
+            if (opts.trace) {
+                std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
+            }
+            std::rethrow_exception(ep);
+        }
         if (opts.jsonOutput) {
             std::cout << buildJsonDiff(report).dump(2) << "\n";
         } else {
             std::cout << formatHumanDiff(report);
         }
+        if (opts.trace) {
+            std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
+        }
     });
     writeCmd->callback([&]() {
         applySchemaCacheDir(argc, argv, schemaCacheDir);
-        Parser parser;
-        ParsedProject project;
-        project.files.push_back(parser.parseFile(std::filesystem::path(writeInput)));
-        std::filesystem::path outPath(writeOutput);
-        bool applied = writeApply;
+        parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
+        if (opts.trace) {
+            parsex::telemetry::TelemetryContext::reset();
+        }
+        bool wrote = false;
         bool success = true;
-        if (applied) {
-            WriteEngine engine;
-            engine.write(project, outPath);
-        } else {
-            // Dry-run: validate without writing to verify the project is writable.
-            WriteEngine engine;
-            ValidationResult problems = engine.validate(project);
-            success = !problems.hasErrors();
-            if (!success) {
-                // Surface validation problems as a thrown error so the top-level
-                // maps to DataErr and prints a single parsex: line; but still
-                // produce a writeResult payload with success=false for --json.
-                // To keep both modes consistent, we throw and let top-level handle
-                // the human path, while the json path already returned below.
-                // Instead, for both paths we simply report via the same payload.
-                // Choose to not throw on dry-run: report success flag in output.
+        std::filesystem::path outPath(writeOutput);
+        std::filesystem::path inPath(writeInput);
+        std::exception_ptr ep;
+        {
+            parsex::telemetry::ScopedSpan span("parsex-cli.write");
+            try {
+                Parser parser;
+                ParsedProject project;
+                project.files.push_back(parser.parseFile(inPath));
+                bool applied = writeApply;
+                wrote = applied;
+                if (applied) {
+                    WriteEngine engine;
+                    engine.write(project, outPath);
+                } else {
+                    WriteEngine engine;
+                    ValidationResult problems = engine.validate(project);
+                    success = !problems.hasErrors();
+                }
+            } catch (...) {
+                ep = std::current_exception();
             }
         }
+        if (ep) {
+            if (opts.trace) {
+                std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
+            }
+            std::rethrow_exception(ep);
+        }
         if (opts.jsonOutput) {
-            std::cout << buildJsonWrite(std::filesystem::path(writeInput), outPath, applied, success).dump(2) << "\n";
+            std::cout << buildJsonWrite(inPath, outPath, wrote, success).dump(2) << "\n";
         } else {
-            std::cout << formatHumanWrite(std::filesystem::path(writeInput), outPath, applied);
-            if (!applied && !success) {
+            std::cout << formatHumanWrite(inPath, outPath, wrote);
+            if (!wrote && !success) {
                 std::cout << "  (would fail: project has write validation errors)\n";
             }
+        }
+        if (opts.trace) {
+            std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
         }
     });
     (void)parseCmd;
