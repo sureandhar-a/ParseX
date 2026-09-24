@@ -126,3 +126,28 @@ inline nlohmann::json validateTool(const nlohmann::json& args) {
     packed["summary"] = humanValidateSummary(result, strict);
     return packed;
 }
+
+// --- Diff ---
+
+inline std::string humanDiffSummary(const DiffReport& report) {
+    if (report.empty()) {
+        return "No differences\n";
+    }
+    return report.toText();
+}
+
+inline nlohmann::json diffTool(const nlohmann::json& args) {
+    const std::string base = args.at("basePath").get<std::string>();
+    const std::string target = args.at("targetPath").get<std::string>();
+    Parser parser;
+    ParsedProject oldProject;
+    ParsedProject newProject;
+    oldProject.files.push_back(parser.parseFile(std::filesystem::path(base)));
+    newProject.files.push_back(parser.parseFile(std::filesystem::path(target)));
+    DiffEngine engine;
+    DiffReport report = engine.diff(oldProject, newProject);
+    nlohmann::json packed;
+    packed["structuredContent"] = report.toJson();
+    packed["summary"] = humanDiffSummary(report);
+    return packed;
+}

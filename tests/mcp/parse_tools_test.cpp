@@ -58,3 +58,20 @@ TEST(ReadTools, ValidateStrictFlagRespected) {
     EXPECT_TRUE(lenientResult["structuredContent"]["payload"]["passed"].get<bool>());
     EXPECT_TRUE(strictResult["structuredContent"]["payload"]["passed"].get<bool>());
 }
+
+TEST(ReadTools, DiffIdenticalIsEmpty) {
+    const std::string file = fixture("schema_valid.arxml");
+    nlohmann::json args = {{"basePath", file}, {"targetPath", file}};
+    nlohmann::json packed;
+    ASSERT_NO_THROW(packed = diffTool(args));
+    EXPECT_EQ(packed["structuredContent"]["kind"], "diffReport");
+    EXPECT_TRUE(packed["structuredContent"]["payload"]["entries"].empty());
+}
+
+TEST(ReadTools, DiffDifferingHasEntries) {
+    nlohmann::json args = {{"basePath", fixture("schema_valid.arxml")},
+                           {"targetPath", fixture("system-4.2.arxml")}};
+    nlohmann::json packed;
+    ASSERT_NO_THROW(packed = diffTool(args));
+    EXPECT_FALSE(packed["structuredContent"]["payload"]["entries"].empty());
+}
