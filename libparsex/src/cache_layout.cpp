@@ -4,30 +4,36 @@
 #include <system_error>
 
 namespace {
-std::filesystem::path g_override;
-bool g_hasOverride{false};
+std::filesystem::path& overridePath() {
+    static std::filesystem::path path;
+    return path;
+}
+bool& hasOverrideFlag() {
+    static bool flag{false};
+    return flag;
+}
 }  // namespace
 
 void setCacheDirectoryOverride(const std::filesystem::path& dir) {
-    g_override = dir;
-    g_hasOverride = true;
+    overridePath() = dir;
+    hasOverrideFlag() = true;
 }
 
 void clearCacheDirectoryOverride() {
-    g_override.clear();
-    g_hasOverride = false;
+    overridePath().clear();
+    hasOverrideFlag() = false;
 }
 
 std::filesystem::path getCacheDirectory() {
-    if (g_hasOverride) {
+    if (hasOverrideFlag()) {
         std::error_code dirError;
-        std::filesystem::create_directories(g_override, dirError);
-        return g_override;
+        std::filesystem::create_directories(overridePath(), dirError);
+        return overridePath();
     }
     std::filesystem::path base;
-    if (const char* xdg = std::getenv("XDG_CACHE_HOME"); xdg != nullptr && *xdg != '\0') {
+    if (const char* xdg = std::getenv("XDG_CACHE_HOME"); xdg != nullptr && *xdg != '\0') { // NOLINT(cppcoreguidelines-init-variables)
         base = xdg;
-    } else if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') {
+    } else if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') { // NOLINT(cppcoreguidelines-init-variables)
         base = std::filesystem::path(home) / ".cache";
     } else {
         base = std::filesystem::temp_directory_path();
