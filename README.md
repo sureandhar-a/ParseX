@@ -39,6 +39,9 @@ Run tests with the preset:
 ctest --preset default
 ```
 
+Full testing strategy (unit, sanitizers, fuzz, stability, shared output,
+slow, coverage): [docs/testing.md](docs/testing.md).
+
 You can also build the release preset:
 
 ```bash

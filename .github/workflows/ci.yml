@@ -1,3 +1,11 @@
+# Ordered pipeline (fail-fast first, slow last):
+#  1. plain build + unit tests (fastest, fails fast)
+#  2. shared-output hardening (fast, focused)
+#  3. sanitizer build + full suite (slower, catches memory issues)
+#  4. coverage + floor check (slowest PR stage; guards against silent regress)
+# Fuzz smoke (needs special compiler + runtime) and slow resource checks run
+# on nightly/manual only — see .github/workflows/nightly.yml. This keeps PR
+# feedback fast while still covering everything daily.
 name: CI
 on:
   push:
@@ -61,6 +69,15 @@ jobs:
           run: ctest --test-dir build/debug --output-on-failure
         - name: Contract hardening
           run: ctest --test-dir build/debug --output-on-failure -L hardening_contract
+        - name: Focused hardening (schema)
+          run: ctest --test-dir build/debug --output-on-failure -L hardening_schema
+        - name: Coverage + floor
+          run: |
+            pip install gcovr || true
+            cmake -S . -B build/coverage -DPARSEX_ENABLE_COVERAGE=ON -DCMAKE_BUILD_TYPE=Debug
+            cmake --build build/coverage --parallel
+            cmake --build build/coverage --target coverage
+            python3 scripts/check_coverage_floor.py
 
         - name: Configure with sanitizers
           if: runner.os != 'Windows'
