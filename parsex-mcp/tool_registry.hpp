@@ -83,7 +83,17 @@ class ToolRegistry {
     }
 
     // Full schemas for all four tools, reusing the report shapes.
+    // Annotations are hints, not access control: clients must treat them as
+    // untrusted metadata when deciding whether to gate confirmation prompts.
     static ToolRegistry withSchemas() {
+        const nlohmann::json readOnlyAnnotations = {{"readOnlyHint", true},
+                                                    {"destructiveHint", false},
+                                                    {"idempotentHint", true},
+                                                    {"openWorldHint", false}};
+        const nlohmann::json writeAnnotations = {{"readOnlyHint", false},
+                                                 {"destructiveHint", true},
+                                                 {"idempotentHint", false},
+                                                 {"openWorldHint", false}};
         ToolRegistry registry;
         {
             ToolDefinition definition;
@@ -92,6 +102,7 @@ class ToolRegistry {
             definition.description = "Parse an ARXML file and report its structure";
             definition.inputSchema = parseInputSchema();
             definition.outputSchema = parseOutputSchema();
+            definition.annotations = readOnlyAnnotations;
             definition.handler = [](const nlohmann::json&) { return nlohmann::json::object(); };
             registry.registerTool(std::move(definition));
         }
@@ -102,6 +113,7 @@ class ToolRegistry {
             definition.description = "Validate an ARXML file";
             definition.inputSchema = validateInputSchema();
             definition.outputSchema = validateOutputSchema();
+            definition.annotations = readOnlyAnnotations;
             definition.handler = [](const nlohmann::json&) { return nlohmann::json::object(); };
             registry.registerTool(std::move(definition));
         }
@@ -112,6 +124,7 @@ class ToolRegistry {
             definition.description = "Diff two ARXML files";
             definition.inputSchema = diffInputSchema();
             definition.outputSchema = diffOutputSchema();
+            definition.annotations = readOnlyAnnotations;
             definition.handler = [](const nlohmann::json&) { return nlohmann::json::object(); };
             registry.registerTool(std::move(definition));
         }
@@ -122,6 +135,7 @@ class ToolRegistry {
             definition.description = "Preview or apply a safe edit (preview by default)";
             definition.inputSchema = writeInputSchema();
             definition.outputSchema = writeOutputSchema();
+            definition.annotations = writeAnnotations;
             definition.handler = [](const nlohmann::json&) { return nlohmann::json::object(); };
             registry.registerTool(std::move(definition));
         }

@@ -4,6 +4,7 @@ add_executable(mcp_tests
     discover_test.cpp
     registry_test.cpp
     schemas_test.cpp
+    tools_list_test.cpp
 )
 
 find_package(nlohmann_json CONFIG REQUIRED)

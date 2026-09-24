@@ -13,18 +13,21 @@
 namespace {
 
 // Routes one validated message. Discovery is optional: every method works
-// whether or not the client asked for identity first. Unknown methods get a
-// well-formed not-found reply so pipe tests can prove framing.
-void dispatchStub(const nlohmann::json& message) {
+// whether or not the client asked for identity first.
+void dispatchMessage(const nlohmann::json& message, const ToolRegistry& registry) {
     try {
         if (!message.is_object() || !message.contains("id")) {
             return;
         }
         const nlohmann::json id = message["id"];
         std::string method;
+        nlohmann::json params = nlohmann::json::object();
         try {
             if (message.contains("method") && message["method"].is_string()) {
                 method = message["method"].get<std::string>();
+            }
+            if (message.contains("params") && message["params"].is_object()) {
+                params = message["params"];
             }
         } catch (...) {
         }
@@ -36,6 +39,21 @@ void dispatchStub(const nlohmann::json& message) {
             writeMessage(response);
             return;
         }
+        if (method == "tools/list") {
+            std::string cursor;
+            try {
+                if (params.contains("cursor") && params["cursor"].is_string()) {
+                    cursor = params["cursor"].get<std::string>();
+                }
+            } catch (...) {
+            }
+            nlohmann::json response;
+            response["jsonrpc"] = "2.0";
+            response["id"] = id;
+            response["result"] = buildToolsListResult(registry, cursor);
+            writeMessage(response);
+            return;
+        }
         writeMessage(makeMethodNotFound(id));
     } catch (...) {
     }
@@ -44,6 +62,7 @@ void dispatchStub(const nlohmann::json& message) {
 }  // namespace
 
 int main() {
+    const ToolRegistry registry = ToolRegistry::withSchemas();
     std::string line;
     while (std::getline(std::cin, line)) {
         // Empty lines carry no message; skip without responding.
@@ -79,7 +98,7 @@ int main() {
                 }
                 continue;
             }
-            dispatchStub(message);
+            dispatchMessage(message, registry);
         } catch (...) {
             // Validation and dispatch must never escape; the loop survives
             // any sequence of malformed lines.
