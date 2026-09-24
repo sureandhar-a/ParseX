@@ -7,6 +7,7 @@
         "json-schema-validator",
         "cli11",
         "gtest",
-        "boost-pfr"
+        "boost-pfr",
+        "approval-tests-cpp"
     ]
 }

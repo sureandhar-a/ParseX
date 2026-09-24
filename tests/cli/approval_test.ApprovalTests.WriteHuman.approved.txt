@@ -1,0 +1,2 @@
+Dry-run: would write /tmp/parsex_approval_write.arxml from schema_valid.arxml (use --apply to apply)
+

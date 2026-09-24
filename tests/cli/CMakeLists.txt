@@ -3,6 +3,7 @@ add_executable(cli_tests
     json_output_test.cpp
     exit_code_test.cpp
     config_test.cpp
+    approval_test.cpp
 )
 find_package(CLI11 CONFIG REQUIRED)
 target_link_libraries(
@@ -22,6 +23,7 @@ target_compile_definitions(
     PARSEX_CLI_BINARY="$<TARGET_FILE:parsex-cli>"
     PARSEX_SCHEMAS_DIR="${CMAKE_SOURCE_DIR}/schemas"
     PARSEX_FIXTURE_FILE="${CMAKE_SOURCE_DIR}/tests/fixtures/tiny_valid.arxml"
+    PARSEX_FIXTURES_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
 )
 # Ensure the CLI binary exists before the tests run (ctest dependency).
 add_dependencies(cli_tests parsex-cli)

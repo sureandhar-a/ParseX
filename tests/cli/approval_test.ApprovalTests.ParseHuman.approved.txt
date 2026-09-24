@@ -1,0 +1,9 @@
+Parsed schema_valid.arxml
+  release: 4.2.2
+  clusters: 0
+  ecuInstances: 0
+  frames: 0
+  pdus: 0
+  signals: 0
+  signalGroups: 0
+
