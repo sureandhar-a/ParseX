@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Boundary probe: malformed version string (no filename token).
+     Must fail as missing release, not as an obscure downstream error. -->
+<AUTOSAR xmlns="http://autosar.org/schema/r4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="not-a-version">
+    <AR-PACKAGES><AR-PACKAGE><SHORT-NAME>System</SHORT-NAME><ELEMENTS/></AR-PACKAGE></AR-PACKAGES>
+</AUTOSAR>
