@@ -171,8 +171,8 @@ inline std::string humanWriteSummary(const std::filesystem::path& input,
     if (applied) {
         out << "Wrote " << output.string() << " from " << input.string() << "\n";
     } else {
-        out << "Dry-run: would write " << output.string() << " from " << input.string()
-            << " (use apply:true to apply)\n";
+        out << "DRY RUN — no changes written. Would write " << output.string() << " from "
+            << input.string() << " (use apply:true to apply)\n";
     }
     return out.str();
 }
@@ -180,12 +180,20 @@ inline std::string humanWriteSummary(const std::filesystem::path& input,
 inline nlohmann::json writeTool(const nlohmann::json& args) {
     const std::string path = args.at("path").get<std::string>();
     const std::string output = args.at("outputPath").get<std::string>();
+    const bool apply = args.value("apply", false);
     const std::filesystem::path inPath(path);
     const std::filesystem::path outPath(output);
     Parser parser;
     ParsedProject project;
     project.files.push_back(parser.parseFile(inPath));
     WriteEngine engine;
+    if (apply) {
+        engine.write(project, outPath);
+        nlohmann::json packed;
+        packed["structuredContent"] = writeEnvelope(inPath, outPath, true, true);
+        packed["summary"] = humanWriteSummary(inPath, outPath, true);
+        return packed;
+    }
     ValidationResult problems = engine.validate(project);
     const bool success = !problems.hasErrors();
     nlohmann::json packed;
