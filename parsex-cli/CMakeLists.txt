@@ -7,6 +7,13 @@ find_package(CLI11 CONFIG REQUIRED)
 # LINK DEPENDENCIES TO EXECUTABLE
 target_link_libraries(parsex-cli PRIVATE libparsex CLI11::CLI11)
 
+# PAR-230: sanitizer build of parsex-cli executable target. libparsex already
+# links PUBLIC parsex_sanitizers, but explicitly link the executable as well so
+# the sanitizer INTERFACE propagates from a dedicated build graph when the
+# preset uses global CMAKE_CXX_FLAGS (and to satisfy the story's explicit
+# requirement that the executable target itself is sanitizer-built).
+target_link_libraries(parsex-cli PRIVATE parsex_sanitizers)
+
 # PAR-211: CTest smoke coverage for CLI help and usage behavior (real binary).
 add_test(NAME cli.bare_requires_subcommand
     COMMAND bash -c "out=$(\"$0\" 2>&1); code=$?; echo \"$out\"; echo \"$out\" | grep -qi \"subcommand is required\" && test $code -ne 0" $<TARGET_FILE:parsex-cli>)
