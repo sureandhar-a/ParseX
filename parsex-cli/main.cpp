@@ -5,6 +5,7 @@
 #include <filesystem>
 #include "CLI/CLI.hpp"
 #include <nlohmann/json.hpp>
+#include "parsex/diff/diff_engine.hpp"
 #include "parsex/diff/diff_report.hpp"
 #include "parsex/json_contract/envelope.hpp"
 #include "parsex/parser/parser.hpp"
@@ -12,6 +13,7 @@
 #include "parsex/schema/schema_registry.hpp"
 #include "parsex/validator/validator.hpp"
 #include "parsex/validator/validation_result.hpp"
+#include "parsex/write/write_engine.hpp"
 #include "parsex/version.hpp"
 #include "color.hpp"
 #include "exit_code.hpp"
@@ -101,8 +103,24 @@ inline std::string formatHumanValidate(const ValidationResult& result, bool stri
 inline std::string formatHumanDiff(const std::string& base, const std::string& target) {
     return "Diff " + base + " vs " + target + ": no differences (placeholder)";
 }
+inline std::string formatHumanDiff(const DiffReport& report) {
+    // Use the engine's own deterministic text rendering (grouped by category).
+    if (report.empty()) {
+        return "No differences\n";
+    }
+    return report.toText();
+}
 inline std::string formatHumanWrite(const std::string& input) {
     return "Wrote " + input + " (placeholder, dry-run)";
+}
+inline std::string formatHumanWrite(const std::filesystem::path& input, const std::filesystem::path& output, bool applied) {
+    std::ostringstream oss;
+    if (applied) {
+        oss << "Wrote " << output.string() << " from " << input.string() << "\n";
+    } else {
+        oss << "Dry-run: would write " << output.string() << " from " << input.string() << " (use --apply to apply)\n";
+    }
+    return oss.str();
 }
 
 // PAR-224: JSON via shared envelope — parseReport payload with counts.
@@ -135,8 +153,19 @@ inline nlohmann::json buildJsonValidate(const ValidationResult& result, bool str
 inline nlohmann::json buildJsonDiff() {
     return DiffReport{}.toJson();
 }
+inline nlohmann::json buildJsonDiff(const DiffReport& report) {
+    return report.toJson();
+}
 inline nlohmann::json buildJsonWrite(const std::string& input) {
     return parsex::json_contract::wrapEnvelope("writeResult", {{"input", input}});
+}
+inline nlohmann::json buildJsonWrite(const std::filesystem::path& input, const std::filesystem::path& output, bool applied, bool success) {
+    nlohmann::json payload;
+    payload["input"] = input.string();
+    payload["output"] = output.string();
+    payload["applied"] = applied;
+    payload["success"] = success;
+    return parsex::json_contract::wrapEnvelope("writeResult", std::move(payload));
 }
 
 }  // namespace
@@ -176,7 +205,7 @@ int main(int argc, char const *argv[])
     auto* parseCmd = app.add_subcommand("parse", "Parse an ARXML file and report its structure");
     auto* validateCmd = app.add_subcommand("validate", "Validate an ARXML file against ParseX rules (exit 0 on run; check payload.passed / human summary for findings; --strict makes warnings fail)");
     auto* diffCmd = app.add_subcommand("diff", "Diff two ARXML files");
-    auto* writeCmd = app.add_subcommand("write", "Apply a safe edit to an ARXML file");
+    auto* writeCmd = app.add_subcommand("write", "Apply a safe edit to an ARXML file (dry-run by default; use --apply to write)");
 
     // Shared input-path options with CLI11 built-in existence validation.
     // Bad paths fail fast at parse time before any engine code runs. Error
@@ -186,6 +215,8 @@ int main(int argc, char const *argv[])
     std::string validateInput;
     bool validateStrict{false};
     std::string writeInput;
+    std::string writeOutput;
+    bool writeApply{false};
     std::string diffBase;
     std::string diffTarget;
     parseCmd->add_option("--input,-i", parseInput, "Input ARXML file")->required()->check(CLI::ExistingFile);
@@ -195,6 +226,9 @@ int main(int argc, char const *argv[])
     // body/payload (see --help). Scripts should check payload.passed, not the process exit code.
     validateCmd->add_flag("--strict", validateStrict, "Strict mode: warnings fail the overall verdict");
     writeCmd->add_option("--input,-i", writeInput, "Input ARXML file")->required()->check(CLI::ExistingFile);
+    // PAR-226: write output and safety. Dry-run unless --apply, so an accidental write never mutates a file.
+    writeCmd->add_option("--output,-o", writeOutput, "Output ARXML file")->required();
+    writeCmd->add_flag("--apply", writeApply, "Actually write the file (without this, dry-run only)");
     diffCmd->add_option("--base", diffBase, "Base ARXML file")->required()->check(CLI::ExistingFile);
     diffCmd->add_option("--target", diffTarget, "Target ARXML file")->required()->check(CLI::ExistingFile);
     parseCmd->callback([&]() {
@@ -252,18 +286,52 @@ int main(int argc, char const *argv[])
     });
     diffCmd->callback([&]() {
         applySchemaCacheDir(argc, argv, schemaCacheDir);
+        Parser parser;
+        ParsedProject oldProject;
+        ParsedProject newProject;
+        oldProject.files.push_back(parser.parseFile(std::filesystem::path(diffBase)));
+        newProject.files.push_back(parser.parseFile(std::filesystem::path(diffTarget)));
+        DiffEngine engine;
+        DiffReport report = engine.diff(oldProject, newProject);
         if (opts.jsonOutput) {
-            std::cout << buildJsonDiff().dump(2) << "\n";
+            std::cout << buildJsonDiff(report).dump(2) << "\n";
         } else {
-            std::cout << formatHumanDiff(diffBase, diffTarget) << "\n";
+            std::cout << formatHumanDiff(report);
         }
     });
     writeCmd->callback([&]() {
         applySchemaCacheDir(argc, argv, schemaCacheDir);
-        if (opts.jsonOutput) {
-            std::cout << buildJsonWrite(writeInput).dump(2) << "\n";
+        Parser parser;
+        ParsedProject project;
+        project.files.push_back(parser.parseFile(std::filesystem::path(writeInput)));
+        std::filesystem::path outPath(writeOutput);
+        bool applied = writeApply;
+        bool success = true;
+        if (applied) {
+            WriteEngine engine;
+            engine.write(project, outPath);
         } else {
-            std::cout << formatHumanWrite(writeInput) << "\n";
+            // Dry-run: validate without writing to verify the project is writable.
+            WriteEngine engine;
+            ValidationResult problems = engine.validate(project);
+            success = !problems.hasErrors();
+            if (!success) {
+                // Surface validation problems as a thrown error so the top-level
+                // maps to DataErr and prints a single parsex: line; but still
+                // produce a writeResult payload with success=false for --json.
+                // To keep both modes consistent, we throw and let top-level handle
+                // the human path, while the json path already returned below.
+                // Instead, for both paths we simply report via the same payload.
+                // Choose to not throw on dry-run: report success flag in output.
+            }
+        }
+        if (opts.jsonOutput) {
+            std::cout << buildJsonWrite(std::filesystem::path(writeInput), outPath, applied, success).dump(2) << "\n";
+        } else {
+            std::cout << formatHumanWrite(std::filesystem::path(writeInput), outPath, applied);
+            if (!applied && !success) {
+                std::cout << "  (would fail: project has write validation errors)\n";
+            }
         }
     });
     (void)parseCmd;

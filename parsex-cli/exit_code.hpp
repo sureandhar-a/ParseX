@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <ios>
 #include <stdexcept>
+#include <string_view>
 
 #include "CLI/CLI.hpp"
 #include "parsex/parser/parse_error.hpp"
@@ -74,6 +75,16 @@ inline ExitCode classify(const std::exception& ex) {
     }
     if (dynamic_cast<const std::ios_base::failure*>(&ex) != nullptr) {
         return ExitCode::IoErr;
+    }
+    // Heuristic: libparsex file-I/O failures often surface as runtime_error
+    // with messages like "failed to write" / "failed to move" (write path).
+    // Treat those as IoErr for script-friendly codes rather than Software.
+    {
+        std::string_view msg = ex.what();
+        if (msg.find("failed to write") != std::string_view::npos ||
+            msg.find("failed to move") != std::string_view::npos) {
+            return ExitCode::IoErr;
+        }
     }
     return ExitCode::Software;
 }
