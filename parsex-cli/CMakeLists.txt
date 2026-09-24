@@ -88,3 +88,34 @@ add_test(NAME cli.exit.usage_nonexistent_file
     COMMAND bash -c "out=$(\"$0\" parse --input /tmp/parsex-does-not-exist-219.arxml 2>&1); code=$?; echo \"$out\"; test $code -ne 0 && echo \"$out\" | grep -qi \"does not exist\"" $<TARGET_FILE:parsex-cli>)
 set_tests_properties(cli.exit.usage_nonexistent_file PROPERTIES
     PASS_REGULAR_EXPRESSION "does not exist")
+
+# PAR-223: precedence chain flag > env > config > default. Each level alone
+# and one combined case. Asserts via the debug log line added in PAR-221
+# ([debug] schema-cache-dir=... (source)). Uses ENVIRONMENT to set/unset
+# PARSEX_SCHEMA_CACHE_DIR without leaking between tests.
+
+add_test(NAME cli.precedence.flag_only
+    COMMAND bash -c "out=$(\"$0\" --schema-cache-dir /tmp/cli-flag-only parse --input \"${CMAKE_SOURCE_DIR}/tests/fixtures/tiny_valid.arxml\" 2>&1); echo \"$out\"; echo \"$out\" | grep -q \"schema-cache-dir=/tmp/cli-flag-only (flag)\"" $<TARGET_FILE:parsex-cli>)
+set_tests_properties(cli.precedence.flag_only PROPERTIES
+    PASS_REGULAR_EXPRESSION "schema-cache-dir=/tmp/cli-flag-only \\(flag\\)")
+
+add_test(NAME cli.precedence.env_only
+    COMMAND bash -c "out=$(\"$0\" parse --input \"${CMAKE_SOURCE_DIR}/tests/fixtures/tiny_valid.arxml\" 2>&1); echo \"$out\"; echo \"$out\" | grep -q \"schema-cache-dir=/tmp/cli-env-only (env)\"" $<TARGET_FILE:parsex-cli>)
+set_tests_properties(cli.precedence.env_only PROPERTIES
+    ENVIRONMENT "PARSEX_SCHEMA_CACHE_DIR=/tmp/cli-env-only"
+    PASS_REGULAR_EXPRESSION "schema-cache-dir=/tmp/cli-env-only \\(env\\)")
+
+add_test(NAME cli.precedence.config_only
+    COMMAND bash -c "cfg=$(mktemp /tmp/parsex_precedence_config_XXXX.toml); echo 'schema-cache-dir=\"/tmp/cli-config-only\"' > \"$cfg\"; out=$(\"$0\" --config \"$cfg\" parse --input \"${CMAKE_SOURCE_DIR}/tests/fixtures/tiny_valid.arxml\" 2>&1); echo \"$out\"; echo \"$out\" | grep -q \"schema-cache-dir=/tmp/cli-config-only (config)\"; rc=$?; rm -f \"$cfg\"; test $rc -eq 0" $<TARGET_FILE:parsex-cli>)
+set_tests_properties(cli.precedence.config_only PROPERTIES
+    PASS_REGULAR_EXPRESSION "schema-cache-dir=/tmp/cli-config-only \\(config\\)")
+
+add_test(NAME cli.precedence.default_only
+    COMMAND bash -c "out=$(\"$0\" parse --input \"${CMAKE_SOURCE_DIR}/tests/fixtures/tiny_valid.arxml\" 2>&1); echo \"$out\"; echo \"$out\" | grep -q \"schema-cache-dir=.*parsex/schemas (default)\"" $<TARGET_FILE:parsex-cli>)
+set_tests_properties(cli.precedence.default_only PROPERTIES
+    PASS_REGULAR_EXPRESSION "schema-cache-dir=.*parsex/schemas \\(default\\)")
+
+add_test(NAME cli.precedence.combined_flag_wins
+    COMMAND bash -c "cfg=$(mktemp /tmp/parsex_precedence_combined_XXXX.toml); echo 'schema-cache-dir=\"/tmp/cli-config-combined\"' > \"$cfg\"; out=$(PARSEX_SCHEMA_CACHE_DIR=/tmp/cli-env-combined \"$0\" --schema-cache-dir /tmp/cli-flag-combined --config \"$cfg\" parse --input \"${CMAKE_SOURCE_DIR}/tests/fixtures/tiny_valid.arxml\" 2>&1); echo \"$out\"; echo \"$out\" | grep -q \"schema-cache-dir=/tmp/cli-flag-combined (flag)\"; rc=$?; rm -f \"$cfg\"; test $rc -eq 0" $<TARGET_FILE:parsex-cli>)
+set_tests_properties(cli.precedence.combined_flag_wins PROPERTIES
+    PASS_REGULAR_EXPRESSION "schema-cache-dir=/tmp/cli-flag-combined \\(flag\\)")
