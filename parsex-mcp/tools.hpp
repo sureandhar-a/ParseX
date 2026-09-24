@@ -60,3 +60,69 @@ inline nlohmann::json parseTool(const nlohmann::json& args) {
     packed["summary"] = humanParseSummary(file);
     return packed;
 }
+
+// --- Validate ---
+
+inline std::string humanValidateSummary(const ValidationResult& result, bool strict) {
+    const bool passed =
+        Validator::overallPassed(result, strict ? StrictMode::Strict : StrictMode::Lenient);
+    std::ostringstream out;
+    out << (passed ? "Validation passed" : "Validation failed") << " (" << result.errors.size()
+        << " issues)\n";
+    for (const auto& error : result.errors) {
+        out << "  [" << (error.severity == Severity::Warning ? "warning" : "error") << "] "
+            << error.code << ": " << error.message << "\n";
+        if (error.path) {
+            out << "    path: " << *error.path << "\n";
+        }
+    }
+    return out.str();
+}
+
+inline nlohmann::json validateEnvelope(const ValidationResult& result, bool strict) {
+    nlohmann::json envelope = result.toJson();
+    const bool passed =
+        Validator::overallPassed(result, strict ? StrictMode::Strict : StrictMode::Lenient);
+    envelope["payload"]["passed"] = passed;
+    return envelope;
+}
+
+inline nlohmann::json validateTool(const nlohmann::json& args) {
+    const std::string path = args.at("path").get<std::string>();
+    const bool strict = args.value("strict", false);
+    Parser parser;
+    ParsedProject project;
+    ValidationResult result;
+    bool parsedOk = false;
+    try {
+        ParsedFile file = parser.parseFile(std::filesystem::path(path));
+        project.files.push_back(std::move(file));
+        parsedOk = true;
+    } catch (const std::exception& ex) {
+        result.errors.push_back({Severity::Error, "parse.failed", ex.what()});
+        parsedOk = false;
+    }
+    if (parsedOk) {
+        try {
+            const std::string& release = project.files.front().autosarRelease;
+            if (!release.empty()) {
+                auto resolved = resolveSchema(release);
+                Validator validator;
+                ValidationResult combined =
+                    validator.validateAll(project, resolved.schema.schemaHandle.get());
+                result.merge(combined);
+            } else {
+                result.errors.push_back(
+                    {Severity::Error,
+                     "schema.no_release",
+                     "cannot determine AUTOSAR release for validation"});
+            }
+        } catch (const std::exception& ex) {
+            result.errors.push_back({Severity::Error, "validator.error", ex.what()});
+        }
+    }
+    nlohmann::json packed;
+    packed["structuredContent"] = validateEnvelope(result, strict);
+    packed["summary"] = humanValidateSummary(result, strict);
+    return packed;
+}

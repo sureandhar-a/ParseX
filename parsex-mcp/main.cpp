@@ -73,6 +73,7 @@ void dispatchMessage(const nlohmann::json& message, const ToolRegistry& registry
 int main() {
     ToolRegistry registry = ToolRegistry::withSchemas();
     registry.setHandler("parse_arxml", parseTool);
+    registry.setHandler("validate_arxml", validateTool);
     std::string line;
     while (std::getline(std::cin, line)) {
         // Empty lines carry no message; skip without responding.
