@@ -1,0 +1,51 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "DRY RUN — no changes written. Would write <tmp>/golden.arxml from <fixtures>/schema_valid.arxml (use apply:true to apply)\n",
+        "type": "text"
+      }
+    ],
+    "resultType": "complete",
+    "structuredContent": {
+      "$schema": "https://parsex.dev/schemas/v1/envelope.json",
+      "contractVersion": "1.0.0",
+      "kind": "writeResult",
+      "payload": {
+        "applied": false,
+        "input": "<fixtures>/schema_valid.arxml",
+        "output": "<tmp>/golden.arxml",
+        "success": true
+      },
+      "toolVersion": "1.0.0"
+    }
+  }
+}
+{
+  "id": 2,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "Wrote <tmp>/golden.arxml from <fixtures>/schema_valid.arxml\n",
+        "type": "text"
+      }
+    ],
+    "resultType": "complete",
+    "structuredContent": {
+      "$schema": "https://parsex.dev/schemas/v1/envelope.json",
+      "contractVersion": "1.0.0",
+      "kind": "writeResult",
+      "payload": {
+        "applied": true,
+        "input": "<fixtures>/schema_valid.arxml",
+        "output": "<tmp>/golden.arxml",
+        "success": true
+      },
+      "toolVersion": "1.0.0"
+    }
+  }
+}
+

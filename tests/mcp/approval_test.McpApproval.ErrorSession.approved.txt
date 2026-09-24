@@ -1,0 +1,30 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "ParseError[Syntax] '<fixtures>/malformed_unclosed.arxml': malformed XML at line 4, column 1: Premature end of data in tag AR-PACKAGES line 3",
+        "type": "text"
+      }
+    ],
+    "isError": true
+  }
+}
+{
+  "error": {
+    "code": -32602,
+    "message": "Unknown tool: unknown_tool"
+  },
+  "id": 2,
+  "jsonrpc": "2.0"
+}
+{
+  "error": {
+    "code": -32602,
+    "message": "Invalid params: arguments do not match tool schema"
+  },
+  "id": 3,
+  "jsonrpc": "2.0"
+}
+

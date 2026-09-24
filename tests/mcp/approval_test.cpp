@@ -63,6 +63,17 @@ std::string normalizeTranscript(std::string s) {
         s.replace(pos, dir.size(), "<fixtures>");
         pos += 12;
     }
+    // Normalize temp output paths so golden files stay machine-independent.
+    const std::string tmpPrefix = "/tmp/bridge-golden";
+    pos = 0;
+    while ((pos = s.find(tmpPrefix, pos)) != std::string::npos) {
+        auto end = s.find(".arxml", pos);
+        if (end == std::string::npos) {
+            break;
+        }
+        s.replace(pos, end + 6 - pos, "<tmp>/golden.arxml");
+        pos += 18;
+    }
     // Pretty-print each line with stable ordering to avoid key-order churn.
     std::string out;
     std::string::size_type start = 0;
@@ -101,6 +112,66 @@ std::string basicSessionInput() {
            escaped + "\"}}}\n";
 }
 
+std::string jsonEscape(const std::string& value) {
+    std::string out;
+    for (char ch : value) {
+        if (ch == '\\' || ch == '"') {
+            out += '\\';
+        }
+        out += ch;
+    }
+    return out;
+}
+
+std::string validateSessionInput() {
+    const std::string file = jsonEscape((fixturesDir() / "schema_valid.arxml").string());
+    return "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"validate_arxml\","
+           "\"arguments\":{\"path\":\"" +
+           file + "\"}}}\n"
+           "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"validate_arxml\","
+           "\"arguments\":{\"path\":\"" +
+           file + "\",\"strict\":true}}}\n";
+}
+
+std::string diffSessionInput() {
+    const std::string same = jsonEscape((fixturesDir() / "schema_valid.arxml").string());
+    const std::string other = jsonEscape((fixturesDir() / "system-4.2.arxml").string());
+    return "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"diff_arxml\","
+           "\"arguments\":{\"basePath\":\"" +
+           same + "\",\"targetPath\":\"" + same + "\"}}}\n"
+           "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"diff_arxml\","
+           "\"arguments\":{\"basePath\":\"" +
+           same + "\",\"targetPath\":\"" + other + "\"}}}\n";
+}
+
+std::string writeSessionInput() {
+    const std::string file = jsonEscape((fixturesDir() / "schema_valid.arxml").string());
+    return "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"write_arxml\","
+           "\"arguments\":{\"path\":\"" +
+           file + "\",\"outputPath\":\"/tmp/bridge-golden-write.arxml\"}}}\n"
+           "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"write_arxml\","
+           "\"arguments\":{\"path\":\"" +
+           file + "\",\"outputPath\":\"/tmp/bridge-golden-write.arxml\",\"apply\":true}}}\n";
+}
+
+std::string errorSessionInput() {
+    const std::string bad = jsonEscape((fixturesDir() / "malformed_unclosed.arxml").string());
+    return "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"parse_arxml\","
+           "\"arguments\":{\"path\":\"" +
+           bad + "\"}}}\n"
+           "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"unknown_tool\","
+           "\"arguments\":{}}}\n"
+           "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"parse_arxml\","
+           "\"arguments\":{}}}\n";
+}
+
+std::string versionSessionInput() {
+    return "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"_meta\":{"
+           "\"io.modelcontextprotocol/protocolVersion\":\"2099-01-01\"}}\n"
+           "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"initialize\",\"params\":{"
+           "\"protocolVersion\":\"2024-01-01\"}}\n";
+}
+
 }  // namespace
 
 // Golden transcripts over real binary sessions. Reviewed baselines live in
@@ -110,5 +181,32 @@ std::string basicSessionInput() {
 
 TEST(McpApproval, BasicSession) {
     std::string output = normalizeTranscript(runSession(basicSessionInput()));
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(McpApproval, ValidateSession) {
+    std::string output = normalizeTranscript(runSession(validateSessionInput()));
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(McpApproval, DiffSession) {
+    std::string output = normalizeTranscript(runSession(diffSessionInput()));
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(McpApproval, WriteSession) {
+    std::filesystem::remove("/tmp/bridge-golden-write.arxml");
+    std::string output = normalizeTranscript(runSession(writeSessionInput()));
+    std::filesystem::remove("/tmp/bridge-golden-write.arxml");
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(McpApproval, ErrorSession) {
+    std::string output = normalizeTranscript(runSession(errorSessionInput()));
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(McpApproval, VersionSession) {
+    std::string output = normalizeTranscript(runSession(versionSessionInput()));
     ApprovalTests::Approvals::verify(output);
 }
