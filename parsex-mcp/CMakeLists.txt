@@ -5,6 +5,10 @@ find_package(nlohmann_json CONFIG REQUIRED)
 
 target_link_libraries(parsex-mcp PRIVATE libparsex nlohmann_json::nlohmann_json)
 
+# Sanitizer build of the executable target. libparsex already links the
+# sanitizer interface, but the executable links it explicitly so the
+# instrumentation propagates from a dedicated build graph and the bridge
+# meets the same bar as the library and the command-line surface.
 target_link_libraries(parsex-mcp PRIVATE parsex_sanitizers)
 
 # Live pipe coverage: drive the built binary over a real stdin/stdout pipe.
