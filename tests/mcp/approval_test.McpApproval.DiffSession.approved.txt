@@ -1,0 +1,342 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "No differences\n",
+        "type": "text"
+      }
+    ],
+    "resultType": "complete",
+    "structuredContent": {
+      "$schema": "https://parsex.dev/schemas/v1/envelope.json",
+      "contractVersion": "1.0.0",
+      "kind": "diffReport",
+      "payload": {
+        "diagnostics": [],
+        "entries": []
+      },
+      "toolVersion": "1.0.0"
+    }
+  }
+}
+{
+  "id": 2,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "Added:\n  Frame /AlarmStatus\n  Cluster /Cluster0\n  EcuInstance /DJ\n  EcuInstance /Dancer\n  Signal /FireAlarm\n  EcuInstance /Guard\n  Signal /Hello\n  Frame /Message1\n  Frame /Message2\n  Frame /Message3\n  Frame /Message4\n  Frame /MessageWithoutPDU\n  Frame /MultiplexedMessage\n  Signal /MultiplexedMessageSelector\n  Signal /MultiplexedMessageStatic\n  Signal /MultiplexedMessageStatic2\n  Signal /MultiplexedStatic\n  Signal /MultiplexedStatic2\n  Frame /OneToContainThemAll\n  Signal /Signal1\n  Signal /Signal2\n  Signal /Signal2_1C\n  Signal /Signal2_SM\n  Signal /Signal4\n  Signal /Signal6\n  Signal /World1\n  Signal /World2\n  Pdu /message1\n  SignalGroup /message1Group\n  Signal /message1_CRC\n  Signal /message1_SeqCounter\n  Pdu /message2\n  Pdu /message3\n  SignalGroup /message3Group\n  Signal /message3_CRC\n  Signal /message3_SeqCounter\n  Pdu /message4\n  Pdu /multiplexed_message_0\n  Pdu /multiplexed_message_1\n  Signal /multiplexed_message_selector\n  Pdu /multiplexed_message_static\n  Signal /signal1\n  Signal /signal2\n  Signal /signal2_1c\n  Signal /signal2_sm\n  Signal /signal3\n  Signal /signal4\n  Signal /signal5\n  Signal /signal6\n",
+        "type": "text"
+      }
+    ],
+    "resultType": "complete",
+    "structuredContent": {
+      "$schema": "https://parsex.dev/schemas/v1/envelope.json",
+      "contractVersion": "1.0.0",
+      "kind": "diffReport",
+      "payload": {
+        "diagnostics": [],
+        "entries": [
+          {
+            "elementType": "Frame",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/AlarmStatus"
+          },
+          {
+            "elementType": "Cluster",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Cluster0"
+          },
+          {
+            "elementType": "EcuInstance",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/DJ"
+          },
+          {
+            "elementType": "EcuInstance",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Dancer"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/FireAlarm"
+          },
+          {
+            "elementType": "EcuInstance",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Guard"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Hello"
+          },
+          {
+            "elementType": "Frame",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Message1"
+          },
+          {
+            "elementType": "Frame",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Message2"
+          },
+          {
+            "elementType": "Frame",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Message3"
+          },
+          {
+            "elementType": "Frame",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Message4"
+          },
+          {
+            "elementType": "Frame",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/MessageWithoutPDU"
+          },
+          {
+            "elementType": "Frame",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/MultiplexedMessage"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/MultiplexedMessageSelector"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/MultiplexedMessageStatic"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/MultiplexedMessageStatic2"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/MultiplexedStatic"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/MultiplexedStatic2"
+          },
+          {
+            "elementType": "Frame",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/OneToContainThemAll"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Signal1"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Signal2"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Signal2_1C"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Signal2_SM"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Signal4"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/Signal6"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/World1"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/World2"
+          },
+          {
+            "elementType": "Pdu",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/message1"
+          },
+          {
+            "elementType": "SignalGroup",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/message1Group"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/message1_CRC"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/message1_SeqCounter"
+          },
+          {
+            "elementType": "Pdu",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/message2"
+          },
+          {
+            "elementType": "Pdu",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/message3"
+          },
+          {
+            "elementType": "SignalGroup",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/message3Group"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/message3_CRC"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/message3_SeqCounter"
+          },
+          {
+            "elementType": "Pdu",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/message4"
+          },
+          {
+            "elementType": "Pdu",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/multiplexed_message_0"
+          },
+          {
+            "elementType": "Pdu",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/multiplexed_message_1"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/multiplexed_message_selector"
+          },
+          {
+            "elementType": "Pdu",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/multiplexed_message_static"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/signal1"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/signal2"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/signal2_1c"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/signal2_sm"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/signal3"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/signal4"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/signal5"
+          },
+          {
+            "elementType": "Signal",
+            "fieldDiffs": [],
+            "kind": "added",
+            "newPath": "/signal6"
+          }
+        ]
+      },
+      "toolVersion": "1.0.0"
+    }
+  }
+}
+

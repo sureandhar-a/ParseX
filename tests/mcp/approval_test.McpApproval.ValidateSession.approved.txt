@@ -1,0 +1,47 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "Validation passed (0 issues)\n",
+        "type": "text"
+      }
+    ],
+    "resultType": "complete",
+    "structuredContent": {
+      "$schema": "https://parsex.dev/schemas/v1/envelope.json",
+      "contractVersion": "1.0.0",
+      "kind": "validationResult",
+      "payload": {
+        "errors": [],
+        "passed": true
+      },
+      "toolVersion": "1.0.0"
+    }
+  }
+}
+{
+  "id": 2,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "Validation passed (0 issues)\n",
+        "type": "text"
+      }
+    ],
+    "resultType": "complete",
+    "structuredContent": {
+      "$schema": "https://parsex.dev/schemas/v1/envelope.json",
+      "contractVersion": "1.0.0",
+      "kind": "validationResult",
+      "payload": {
+        "errors": [],
+        "passed": true
+      },
+      "toolVersion": "1.0.0"
+    }
+  }
+}
+

@@ -297,6 +297,7 @@ parsex --json write --input tests/fixtures/schema_valid.arxml --output /tmp/out.
 
 ## Cross-links
 
+* The bridge twin is documented in `docs/mcp.md` — same engines and report shapes over stdio tools; readers of one should read the other.
 * The v1 design references in `docs/spec.md`, `docs/hld.md`, and `docs/lld.md` (requirements, high-level and low-level design, all 7 core components) mention the CLI only abstractly — this file (`docs/cli.md`) is the concrete reference those docs should link to for the implemented interface.
 * The JSON Output Contract's envelope and schemas live in `schemas/envelope.schema.json` and `schemas/*.schema.json`; the CLI reuses `wrapEnvelope()` and never hardcodes `contractVersion`/`toolVersion`.
 * The telemetry model and `TELEMETRY_SCOPE.md` ("no phone-home") are the authority for `--trace` and `ScopedSpan` naming.
