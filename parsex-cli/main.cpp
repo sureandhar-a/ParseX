@@ -9,6 +9,8 @@
 #include "parsex/json_contract/envelope.hpp"
 #include "parsex/parser/parser.hpp"
 #include "parsex/schema/cache_layout.hpp"
+#include "parsex/schema/schema_registry.hpp"
+#include "parsex/validator/validator.hpp"
 #include "parsex/validator/validation_result.hpp"
 #include "parsex/version.hpp"
 #include "color.hpp"
@@ -84,6 +86,18 @@ inline std::string formatHumanParse(const ParsedFile& pf) {
 inline std::string formatHumanValidate(const std::string& input) {
     return "Validated " + input + ": OK (placeholder)";
 }
+inline std::string formatHumanValidate(const ValidationResult& result, bool strict) {
+    bool passed = Validator::overallPassed(result, strict ? StrictMode::Strict : StrictMode::Lenient);
+    std::ostringstream oss;
+    oss << (passed ? "Validation passed" : "Validation failed") << " (" << result.errors.size() << " issues)\n";
+    for (const auto& e : result.errors) {
+        oss << "  [" << (e.severity == Severity::Warning ? "warning" : "error") << "] " << e.code << ": " << e.message << "\n";
+        if (e.path) {
+            oss << "    path: " << *e.path << "\n";
+        }
+    }
+    return oss.str();
+}
 inline std::string formatHumanDiff(const std::string& base, const std::string& target) {
     return "Diff " + base + " vs " + target + ": no differences (placeholder)";
 }
@@ -111,6 +125,12 @@ inline nlohmann::json buildJsonParse(const ParsedFile& pf) {
 }
 inline nlohmann::json buildJsonValidate() {
     return ValidationResult{}.toJson();
+}
+inline nlohmann::json buildJsonValidate(const ValidationResult& result, bool strict) {
+    auto envelope = result.toJson();
+    bool passed = Validator::overallPassed(result, strict ? StrictMode::Strict : StrictMode::Lenient);
+    envelope["payload"]["passed"] = passed;
+    return envelope;
 }
 inline nlohmann::json buildJsonDiff() {
     return DiffReport{}.toJson();
@@ -154,7 +174,7 @@ int main(int argc, char const *argv[])
     app.add_option("--schema-cache-dir", schemaCacheDir, "Directory for cached AUTOSAR schemas");
 
     auto* parseCmd = app.add_subcommand("parse", "Parse an ARXML file and report its structure");
-    auto* validateCmd = app.add_subcommand("validate", "Validate an ARXML file against ParseX rules");
+    auto* validateCmd = app.add_subcommand("validate", "Validate an ARXML file against ParseX rules (exit 0 on run; check payload.passed / human summary for findings; --strict makes warnings fail)");
     auto* diffCmd = app.add_subcommand("diff", "Diff two ARXML files");
     auto* writeCmd = app.add_subcommand("write", "Apply a safe edit to an ARXML file");
 
@@ -164,11 +184,16 @@ int main(int argc, char const *argv[])
     // clig.dev tone polish belongs to PAR-204, not here.
     std::string parseInput;
     std::string validateInput;
+    bool validateStrict{false};
     std::string writeInput;
     std::string diffBase;
     std::string diffTarget;
     parseCmd->add_option("--input,-i", parseInput, "Input ARXML file")->required()->check(CLI::ExistingFile);
     validateCmd->add_option("--input,-i", validateInput, "Input ARXML file")->required()->check(CLI::ExistingFile);
+    // PAR-225: --strict sequences Parser before Validator per lld.md (validate --strict, then parse).
+    // Exit-code convention: validate findings never cause non-zero exit; pass/fail lives in the report
+    // body/payload (see --help). Scripts should check payload.passed, not the process exit code.
+    validateCmd->add_flag("--strict", validateStrict, "Strict mode: warnings fail the overall verdict");
     writeCmd->add_option("--input,-i", writeInput, "Input ARXML file")->required()->check(CLI::ExistingFile);
     diffCmd->add_option("--base", diffBase, "Base ARXML file")->required()->check(CLI::ExistingFile);
     diffCmd->add_option("--target", diffTarget, "Target ARXML file")->required()->check(CLI::ExistingFile);
@@ -184,11 +209,46 @@ int main(int argc, char const *argv[])
     });
     validateCmd->callback([&]() {
         applySchemaCacheDir(argc, argv, schemaCacheDir);
-        if (opts.jsonOutput) {
-            std::cout << buildJsonValidate().dump(2) << "\n";
-        } else {
-            std::cout << formatHumanValidate(validateInput) << "\n";
+        Parser parser;
+        ParsedProject project;
+        ValidationResult result;
+        // PAR-225: --strict sequences Parser before Validator; both paths treat
+        // a hard parse failure as a validation finding (not a process error),
+        // but strict mode also fails the verdict on warnings via overallPassed.
+        try {
+            auto pf = parser.parseFile(std::filesystem::path(validateInput));
+            project.files.push_back(std::move(pf));
+        } catch (const std::exception& ex) {
+            result.errors.push_back({Severity::Error, "parse.failed", ex.what()});
+            if (opts.jsonOutput) {
+                std::cout << buildJsonValidate(result, validateStrict).dump(2) << "\n";
+            } else {
+                std::cout << formatHumanValidate(result, validateStrict);
+            }
+            return;
         }
+        // Resolve shared schema for the first file's release and run full validation.
+        try {
+            const std::string& release = project.files.front().autosarRelease;
+            if (!release.empty()) {
+                auto resolved = resolveSchema(release);
+                Validator validator;
+                auto combined = validator.validateAll(project, resolved.schema.schemaHandle.get());
+                result.merge(combined);
+            } else {
+                result.errors.push_back({Severity::Error, "schema.no_release", "cannot determine AUTOSAR release for validation"});
+            }
+        } catch (const std::exception& ex) {
+            result.errors.push_back({Severity::Error, "validator.error", ex.what()});
+        }
+        if (opts.jsonOutput) {
+            std::cout << buildJsonValidate(result, validateStrict).dump(2) << "\n";
+        } else {
+            std::cout << formatHumanValidate(result, validateStrict);
+        }
+        // Validations findings do not change the process exit code — always 0
+        // when the tool ran; pass/fail lives in payload.passed. Only malformed
+        // invocation or I/O (handled by top-level catch) causes non-zero.
     });
     diffCmd->callback([&]() {
         applySchemaCacheDir(argc, argv, schemaCacheDir);
