@@ -128,6 +128,30 @@ int main(int argc, char const *argv[])
 
     app.require_subcommand(1);
 
-    CLI11_PARSE(app, argc, argv);
+    // PAR-218: single top-level error boundary per clig.dev. CLI11 parse
+    // failures are delegated to app.exit() (which handles --help/--version's
+    // Success paths correctly); everything else is rewritten to one
+    // `parsex: <message>` line on stderr and mapped via classify().
+    // Error output always goes to stderr, even under --json; --json failure
+    // stays plain-text on stderr (JSON error envelope is a documented future
+    // enhancement, not this Story).
+    try {
+        app.parse(argc, argv);
+    } catch (const CLI::ParseError& err) {
+        return app.exit(err);
+    } catch (const std::exception& ex) {
+        // Keep the message on one line; collapse any embedded newlines so the
+        // boundary never emits multi-line diagnostics.
+        std::string msg = ex.what();
+        for (char& ch : msg) {
+            if (ch == '\n' || ch == '\r') {
+                ch = ' ';
+            }
+        }
+        // Prefix with program name per clig.dev error guidance; avoid raw
+        // exception type dumps when the existing what() is already friendly.
+        std::cerr << "parsex: " << msg << "\n";
+        return static_cast<int>(parsex::cli::classify(ex));
+    }
     return 0;
 }
