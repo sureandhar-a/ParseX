@@ -1,0 +1,20 @@
+{
+  "$schema": "https://parsex.dev/schemas/v1/envelope.json",
+  "contractVersion": "1.0.0",
+  "kind": "parseReport",
+  "payload": {
+    "autosarRelease": "4.2.2",
+    "counts": {
+      "clusters": 0,
+      "ecuInstances": 0,
+      "frames": 0,
+      "pdus": 0,
+      "signalGroups": 0,
+      "signals": 0
+    },
+    "sourcePath": "schema_valid.arxml",
+    "warnings": []
+  },
+  "toolVersion": "1.0.0"
+}
+

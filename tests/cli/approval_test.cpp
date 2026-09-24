@@ -1,0 +1,170 @@
+#define APPROVALS_GOOGLETEST
+#include "ApprovalTests.hpp"
+
+#include <array>
+#include <cstdio>
+#include <filesystem>
+#include <stdexcept>
+#include <string>
+
+#include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
+
+namespace fs = std::filesystem;
+
+namespace {
+
+fs::path cliBinary() {
+#ifdef PARSEX_CLI_BINARY
+    return fs::path(PARSEX_CLI_BINARY);
+#else
+    return fs::path("parsex-cli");
+#endif
+}
+
+fs::path fixturesDir() {
+#ifdef PARSEX_FIXTURES_DIR
+    return fs::path(PARSEX_FIXTURES_DIR);
+#else
+    return fs::path("tests/fixtures");
+#endif
+}
+
+// Capture stdout of command (stderr redirected to /dev/null to hide [debug] line).
+std::string captureStdout(const std::string& cmd) {
+    std::array<char, 4096> buf{};
+    std::string out;
+    // Redirect stderr to /dev/null so only human stdout is approved.
+    std::string fullCmd = cmd + " 2>/dev/null";
+    FILE* pipe = ::popen(fullCmd.c_str(), "r");
+    if (!pipe) {
+        throw std::runtime_error("popen failed: " + fullCmd);
+    }
+    while (fgets(buf.data(), static_cast<int>(buf.size()), pipe) != nullptr) {
+        out += buf.data();
+    }
+    int rc = ::pclose(pipe);
+    // Approval tests should still pass even if command succeeds; we just verify output.
+    // Hard fail if command failed (non-zero) to avoid approving error output.
+    if (rc != 0) {
+        throw std::runtime_error("command failed with code " + std::to_string(rc) + ": " + cmd + "\noutput: " + out);
+    }
+    return out;
+}
+
+std::string normalizeForApproval(std::string s) {
+    // Make output machine-independent: replace absolute fixture dir with empty.
+    std::string dir = fixturesDir().string();
+    std::string::size_type pos = 0;
+    while ((pos = s.find(dir, pos)) != std::string::npos) {
+        s.replace(pos, dir.size(), "");
+        // Remove leading "/" left after stripping dir (e.g. "/schema_valid" -> "schema_valid")
+        if (pos < s.size() && s[pos] == '/') {
+            s.erase(pos, 1);
+        }
+        pos += 1;
+    }
+    // Also normalize any absolute /tmp path prefix that appears in write output
+    // (e.g. "/tmp/parsex_approval_write.arxml" is already stable, keep as is)
+    return s;
+}
+
+std::string runParseHuman() {
+    return captureStdout("\"" + cliBinary().string() + "\" parse --input \"" + (fixturesDir() / "schema_valid.arxml").string() + "\"");
+}
+
+std::string runValidateHuman() {
+    return captureStdout("\"" + cliBinary().string() + "\" validate --input \"" + (fixturesDir() / "schema_valid.arxml").string() + "\"");
+}
+
+std::string runDiffHuman() {
+    return captureStdout("\"" + cliBinary().string() + "\" diff --base \"" + (fixturesDir() / "schema_valid.arxml").string() + "\" --target \"" + (fixturesDir() / "schema_valid.arxml").string() + "\"");
+}
+
+std::string runWriteHuman() {
+    return captureStdout("\"" + cliBinary().string() + "\" write --input \"" + (fixturesDir() / "schema_valid.arxml").string() + "\" --output /tmp/parsex_approval_write.arxml");
+}
+
+std::string runParseJson() {
+    return captureStdout("\"" + cliBinary().string() + "\" --json parse --input \"" + (fixturesDir() / "schema_valid.arxml").string() + "\"");
+}
+
+std::string runValidateJson() {
+    return captureStdout("\"" + cliBinary().string() + "\" --json validate --input \"" + (fixturesDir() / "schema_valid.arxml").string() + "\"");
+}
+
+std::string runDiffJson() {
+    return captureStdout("\"" + cliBinary().string() + "\" --json diff --base \"" + (fixturesDir() / "schema_valid.arxml").string() + "\" --target \"" + (fixturesDir() / "schema_valid.arxml").string() + "\"");
+}
+
+std::string runWriteJson() {
+    return captureStdout("\"" + cliBinary().string() + "\" --json write --input \"" + (fixturesDir() / "schema_valid.arxml").string() + "\" --output /tmp/parsex_approval_write.arxml");
+}
+
+std::string normalizeJsonForApproval(std::string s) {
+    // First apply path normalization (fixture dir).
+    s = normalizeForApproval(std::move(s));
+    // Then use JSON-aware normalization: parse and re-dump with stable 2-space indent.
+    // This avoids false failures from key-ordering differences (e.g. nlohmann insertion order).
+    // If ApprovalTests' JSON comparator is available, it would do similar; we do manual.
+    try {
+        auto j = nlohmann::json::parse(s);
+        // Re-dump with sorted keys? nlohmann doesn't sort, but re-parsing then dumping
+        // preserves the file's key order which is deterministic from wrapEnvelope.
+        // To be extra stable, we output with dump(2) which is consistent.
+        return j.dump(2) + "\n";
+    } catch (...) {
+        return s;
+    }
+}
+
+}  // namespace
+
+// PAR-228: golden-file (approval) tests over real subcommand invocations.
+// Each test verifies human-readable stdout; .approved.txt files are reviewed and committed.
+// To regenerate after intentional output change: review the .received.txt diff, then copy it over the .approved.txt.
+
+TEST(ApprovalTests, ParseHuman) {
+    auto output = normalizeForApproval(runParseHuman());
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(ApprovalTests, ValidateHuman) {
+    auto output = normalizeForApproval(runValidateHuman());
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(ApprovalTests, DiffHuman) {
+    auto output = normalizeForApproval(runDiffHuman());
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(ApprovalTests, WriteHuman) {
+    auto output = normalizeForApproval(runWriteHuman());
+    ApprovalTests::Approvals::verify(output);
+}
+
+// PAR-229: golden-file coverage for --json output alongside human output.
+// Both modes are tested for all four subcommands; a deliberate regression
+// (temporarily break one field) is caught by the approval diff before revert.
+// JSON-wise we use nlohmann::json parse+dumps to avoid key-ordering false failures.
+
+TEST(ApprovalTests, ParseJson) {
+    auto output = normalizeJsonForApproval(runParseJson());
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(ApprovalTests, ValidateJson) {
+    auto output = normalizeJsonForApproval(runValidateJson());
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(ApprovalTests, DiffJson) {
+    auto output = normalizeJsonForApproval(runDiffJson());
+    ApprovalTests::Approvals::verify(output);
+}
+
+TEST(ApprovalTests, WriteJson) {
+    auto output = normalizeJsonForApproval(runWriteJson());
+    ApprovalTests::Approvals::verify(output);
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://parsex.dev/schemas/v1/envelope.json",
+  "contractVersion": "1.0.0",
+  "kind": "diffReport",
+  "payload": {
+    "diagnostics": [],
+    "entries": []
+  },
+  "toolVersion": "1.0.0"
+}
+
