@@ -1,5 +1,6 @@
 add_executable(mcp_tests
     transport_test.cpp
+    protocol_test.cpp
 )
 
 find_package(nlohmann_json CONFIG REQUIRED)

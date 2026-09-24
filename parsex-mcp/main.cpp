@@ -3,6 +3,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "protocol.hpp"
 #include "transport.hpp"
 
 // Convention: writeMessage() is the only function allowed to write to
@@ -24,13 +25,40 @@ int main() {
         if (line.empty()) {
             continue;
         }
+        nlohmann::json message;
         try {
-            nlohmann::json message = nlohmann::json::parse(line);
-            dispatchStub(message);
+            message = nlohmann::json::parse(line);
         } catch (const std::exception& ex) {
-            // Minimal resilience for the first step: never let a bad line
-            // kill the loop. Detailed error codes arrive next.
-            std::cerr << "skipping malformed line: " << ex.what() << "\n";
+            // No valid JSON means no reliable id. Try to recover one for a
+            // proper Parse Error; otherwise log to stderr and keep looping.
+            try {
+                auto recovered = tryRecoverId(line);
+                if (recovered.has_value()) {
+                    try {
+                        writeMessage(makeParseError(*recovered));
+                    } catch (...) {
+                    }
+                } else {
+                    std::cerr << "skipping malformed line: " << ex.what() << "\n";
+                }
+            } catch (...) {
+                std::cerr << "skipping malformed line\n";
+            }
+            continue;
+        }
+        try {
+            if (!isValidEnvelope(message)) {
+                try {
+                    writeMessage(makeInvalidRequest(idOrNull(message)));
+                } catch (...) {
+                }
+                continue;
+            }
+            dispatchStub(message);
+        } catch (...) {
+            // Validation and dispatch must never escape; the loop survives
+            // any sequence of malformed lines.
+            std::cerr << "skipping invalid message\n";
         }
     }
     // EOF is the normal shutdown path for a stdio server.
