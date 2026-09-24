@@ -3,6 +3,11 @@
 
 #include <nlohmann/json.hpp>
 
+#include "transport.hpp"
+
+// Convention: writeMessage() is the only function allowed to write to
+// std::cout. All diagnostics go to stderr so stdout stays pure protocol.
+
 namespace {
 
 // Placeholder dispatcher for the first transport step.
