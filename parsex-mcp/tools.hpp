@@ -151,3 +151,45 @@ inline nlohmann::json diffTool(const nlohmann::json& args) {
     packed["summary"] = humanDiffSummary(report);
     return packed;
 }
+
+// --- Write (preview-only for this step; apply gating arrives next) ---
+
+inline nlohmann::json writeEnvelope(const std::filesystem::path& input,
+                                    const std::filesystem::path& output, bool applied,
+                                    bool success) {
+    nlohmann::json payload;
+    payload["input"] = input.string();
+    payload["output"] = output.string();
+    payload["applied"] = applied;
+    payload["success"] = success;
+    return parsex::json_contract::wrapEnvelope("writeResult", std::move(payload));
+}
+
+inline std::string humanWriteSummary(const std::filesystem::path& input,
+                                     const std::filesystem::path& output, bool applied) {
+    std::ostringstream out;
+    if (applied) {
+        out << "Wrote " << output.string() << " from " << input.string() << "\n";
+    } else {
+        out << "Dry-run: would write " << output.string() << " from " << input.string()
+            << " (use apply:true to apply)\n";
+    }
+    return out.str();
+}
+
+inline nlohmann::json writeTool(const nlohmann::json& args) {
+    const std::string path = args.at("path").get<std::string>();
+    const std::string output = args.at("outputPath").get<std::string>();
+    const std::filesystem::path inPath(path);
+    const std::filesystem::path outPath(output);
+    Parser parser;
+    ParsedProject project;
+    project.files.push_back(parser.parseFile(inPath));
+    WriteEngine engine;
+    ValidationResult problems = engine.validate(project);
+    const bool success = !problems.hasErrors();
+    nlohmann::json packed;
+    packed["structuredContent"] = writeEnvelope(inPath, outPath, false, success);
+    packed["summary"] = humanWriteSummary(inPath, outPath, false);
+    return packed;
+}
