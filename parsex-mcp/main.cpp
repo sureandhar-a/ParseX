@@ -49,12 +49,30 @@ void dispatchMessage(const nlohmann::json& message, const ToolRegistry& registry
         } catch (...) {
         }
         if (!hasId) {
-            // Legacy handshake uses a request with id, so notifications fall
-            // through here with no response.
+            // Cancellation is best-effort in this version: the server handles
+            // one request at a time on a single thread, so there is no
+            // in-flight work to interrupt. A notice for an already-completed
+            // or unknown request is safely ignored. True mid-call
+            // cancellation would need cooperatively cancellable engines, out
+            // of scope for now. Never responds on stdout (it is a
+            // notification, not a request).
             try {
                 std::string methodCheck;
                 if (message.contains("method") && message["method"].is_string()) {
                     methodCheck = message["method"].get<std::string>();
+                }
+                if (methodCheck == "notifications/cancelled") {
+                    try {
+                        std::string ref;
+                        if (message.contains("params") && message["params"].is_object() &&
+                            message["params"].contains("requestId")) {
+                            ref = message["params"]["requestId"].dump();
+                        }
+                        std::cerr << "cancellation ignored for " << (ref.empty() ? "unknown" : ref)
+                                  << "\n";
+                    } catch (...) {
+                    }
+                    return;
                 }
                 if (methodCheck == "initialize") {
                     return;
