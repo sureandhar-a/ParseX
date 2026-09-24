@@ -86,8 +86,11 @@ TEST(CliJsonOutput, JsonValidateConformsToEnvelopeSchema) {
 
 // PAR-215.2: without --json, stdout is human-readable, not JSON.
 TEST(CliJsonOutput, HumanOutputIsNotJson) {
+    // PAR-224: parse now calls real Parser; tiny_valid.arxml is unsupported
+    // (4.0.0). Use a fixture that the Parser can actually handle.
+    const fs::path parseFixture = schemasDir().parent_path() / "tests/fixtures/schema_valid.arxml";
     const std::string cmd =
-        "\"" + cliBinary().string() + "\" parse --input \"" + fixtureFile().string() + "\" 2>/dev/null";
+        "\"" + cliBinary().string() + "\" parse --input \"" + parseFixture.string() + "\" 2>/dev/null";
     const auto [rc, out] = runCapture(cmd);
     EXPECT_EQ(rc, 0) << "cmd: " << cmd << "\noutput: " << out;
     const std::string trimmed = trimLeft(out);
@@ -97,8 +100,9 @@ TEST(CliJsonOutput, HumanOutputIsNotJson) {
 
 // PAR-215.3: --json stdout stays clean (single JSON doc, no stray log lines).
 TEST(CliJsonOutput, JsonStdoutContainsOnlyJson) {
+    const fs::path parseFixture = schemasDir().parent_path() / "tests/fixtures/schema_valid.arxml";
     const std::string cmd =
-        "\"" + cliBinary().string() + "\" --json parse --input \"" + fixtureFile().string() + "\" 2>/dev/null";
+        "\"" + cliBinary().string() + "\" --json parse --input \"" + parseFixture.string() + "\" 2>/dev/null";
     const auto [rc, out] = runCapture(cmd);
     EXPECT_EQ(rc, 0) << "cmd: " << cmd << "\noutput: " << out;
     nlohmann::json doc;

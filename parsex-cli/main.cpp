@@ -1,11 +1,13 @@
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <cstdlib>
 #include <filesystem>
 #include "CLI/CLI.hpp"
 #include <nlohmann/json.hpp>
 #include "parsex/diff/diff_report.hpp"
 #include "parsex/json_contract/envelope.hpp"
+#include "parsex/parser/parser.hpp"
 #include "parsex/schema/cache_layout.hpp"
 #include "parsex/validator/validation_result.hpp"
 #include "parsex/version.hpp"
@@ -59,10 +61,26 @@ inline void applySchemaCacheDir(int argc, char const* const* argv, const std::st
     }
 }
 
-// PAR-213: human-readable placeholders (real formatting arrives in PAR-206).
-inline std::string formatHumanParse(const std::string& input) {
-    return "Parsed " + input + " (placeholder)";
+// PAR-224: human-readable formatting for Parser output (real engine, not placeholder).
+inline std::string formatHumanParse(const ParsedFile& pf) {
+    std::ostringstream oss;
+    oss << "Parsed " << pf.sourcePath.string() << "\n";
+    oss << "  release: " << (pf.autosarRelease.empty() ? "(unknown)" : pf.autosarRelease) << "\n";
+    oss << "  clusters: " << pf.clusters.size() << "\n";
+    oss << "  ecuInstances: " << pf.ecuInstances.size() << "\n";
+    oss << "  frames: " << pf.frames.size() << "\n";
+    oss << "  pdus: " << pf.pdus.size() << "\n";
+    oss << "  signals: " << pf.signals.size() << "\n";
+    oss << "  signalGroups: " << pf.signalGroups.size() << "\n";
+    if (!pf.warnings.empty()) {
+        oss << "  warnings: " << pf.warnings.size() << "\n";
+        for (const auto& w : pf.warnings) {
+            oss << "    - " << w.message << "\n";
+        }
+    }
+    return oss.str();
 }
+
 inline std::string formatHumanValidate(const std::string& input) {
     return "Validated " + input + ": OK (placeholder)";
 }
@@ -73,14 +91,23 @@ inline std::string formatHumanWrite(const std::string& input) {
     return "Wrote " + input + " (placeholder, dry-run)";
 }
 
-// PAR-213: JSON branches via the shared Output Contract helper so
-// contractVersion/toolVersion never diverge with CLI-local copies.
-// validate/diff reuse the engines' own toJson() (already envelope-wrapped
-// and schema-valid); parse/write use wrapEnvelope() directly with placeholder
-// payloads until PAR-206 wires the real engines (schema extension for the new
-// kinds tracked there).
-inline nlohmann::json buildJsonParse(const std::string& input) {
-    return parsex::json_contract::wrapEnvelope("parseReport", {{"input", input}});
+// PAR-224: JSON via shared envelope — parseReport payload with counts.
+inline nlohmann::json buildJsonParse(const ParsedFile& pf) {
+    nlohmann::json payload;
+    payload["sourcePath"] = pf.sourcePath.string();
+    payload["autosarRelease"] = pf.autosarRelease;
+    payload["counts"] = {{"clusters", pf.clusters.size()},
+                         {"ecuInstances", pf.ecuInstances.size()},
+                         {"frames", pf.frames.size()},
+                         {"pdus", pf.pdus.size()},
+                         {"signals", pf.signals.size()},
+                         {"signalGroups", pf.signalGroups.size()}};
+    nlohmann::json warnings = nlohmann::json::array();
+    for (const auto& w : pf.warnings) {
+        warnings.push_back({{"message", w.message}});
+    }
+    payload["warnings"] = std::move(warnings);
+    return parsex::json_contract::wrapEnvelope("parseReport", std::move(payload));
 }
 inline nlohmann::json buildJsonValidate() {
     return ValidationResult{}.toJson();
@@ -147,10 +174,12 @@ int main(int argc, char const *argv[])
     diffCmd->add_option("--target", diffTarget, "Target ARXML file")->required()->check(CLI::ExistingFile);
     parseCmd->callback([&]() {
         applySchemaCacheDir(argc, argv, schemaCacheDir);
+        Parser parser;
+        ParsedFile pf = parser.parseFile(std::filesystem::path(parseInput));
         if (opts.jsonOutput) {
-            std::cout << buildJsonParse(parseInput).dump(2) << "\n";
+            std::cout << buildJsonParse(pf).dump(2) << "\n";
         } else {
-            std::cout << formatHumanParse(parseInput) << "\n";
+            std::cout << formatHumanParse(pf);
         }
     });
     validateCmd->callback([&]() {
