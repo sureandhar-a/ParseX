@@ -2,6 +2,7 @@ add_executable(cli_tests
     color_test.cpp
     json_output_test.cpp
     exit_code_test.cpp
+    config_test.cpp
 )
 find_package(CLI11 CONFIG REQUIRED)
 target_link_libraries(

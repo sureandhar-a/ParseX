@@ -188,6 +188,10 @@ int main(int argc, char const *argv[])
     // silently ignored, not errored). Earlier doc assumed default errors, but
     // CLI11 2.x defaults to Ignore; the choice is reified with a test in
     // PAR-222, including the misspelled-key sharp edge.
+    // Known sharp edge: a typo like `schema-cach-dir` in the config file is
+    // silently ignored (no warning), so the misspelled option has no effect.
+    // Fixing this would require custom validation beyond CLI11's built-in
+    // handling, out of scope for this Story — documented here instead.
     app.set_config("--config", "", "Read a config file", false);
 
     app.require_subcommand(1);
