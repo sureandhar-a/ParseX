@@ -126,6 +126,14 @@ int main(int argc, char const *argv[])
     (void)diffCmd;
     (void)writeCmd;
 
+    // PAR-220: CLI11 built-in config-file support (TOML-like). Empty default
+    // (not required) so the tool works without one. Leave
+    // allow_config_extras() at CLI11's default (Ignore — unknown keys are
+    // silently ignored, not errored). Earlier doc assumed default errors, but
+    // CLI11 2.x defaults to Ignore; the choice is reified with a test in
+    // PAR-222, including the misspelled-key sharp edge.
+    app.set_config("--config", "", "Read a config file", false);
+
     app.require_subcommand(1);
 
     // PAR-218: single top-level error boundary per clig.dev. CLI11 parse
