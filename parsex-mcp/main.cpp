@@ -3,6 +3,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "dispatch.hpp"
 #include "protocol.hpp"
 #include "server.hpp"
 #include "transport.hpp"
@@ -52,6 +53,13 @@ void dispatchMessage(const nlohmann::json& message, const ToolRegistry& registry
             response["id"] = id;
             response["result"] = buildToolsListResult(registry, cursor);
             writeMessage(response);
+            return;
+        }
+        if (method == "tools/call") {
+            try {
+                writeMessage(dispatchToolsCall(id, params, registry));
+            } catch (...) {
+            }
             return;
         }
         writeMessage(makeMethodNotFound(id));
