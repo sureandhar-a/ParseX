@@ -10,6 +10,7 @@ add_executable(mcp_tests
     write_tools_test.cpp
     version_test.cpp
     cancel_test.cpp
+    approval_test.cpp
 )
 
 find_package(nlohmann_json CONFIG REQUIRED)
