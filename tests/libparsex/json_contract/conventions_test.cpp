@@ -66,8 +66,8 @@ ParsedEnvelope parseEnvelopeLenient(const nlohmann::json& doc) {
 nlohmann::json exampleEnvelope() {
     return nlohmann::json{
         {"$schema", "https://parsex.dev/schemas/v1/envelope.json"},
-        {"contractVersion", "1.0.0"},
-        {"toolVersion", "1.0.0"},
+        {"contractVersion", "0.1.0"},
+        {"toolVersion", "0.1.0"},
         {"kind", "validationResult"},
         {"payload", nlohmann::json{{"passed", true}}},
     };
@@ -101,8 +101,8 @@ TEST(ConventionsTest, EnvelopeExampleHasZeroNamingViolations) {
 
 TEST(ConventionsTest, SnakeCaseKeysAreFlagged) {
     const nlohmann::json doc = nlohmann::json{
-        {"contract_version", "1.0.0"},
-        {"toolVersion", "1.0.0"},
+        {"contract_version", "0.1.0"},
+        {"toolVersion", "0.1.0"},
     };
     std::vector<std::string> bad;
     collectNonCamelCaseKeys(doc, bad);
@@ -115,7 +115,7 @@ TEST(ConventionsTest, UnknownTopLevelKeyIsIgnored) {
     doc["futureField"] = "added in a later minor version";
     ParsedEnvelope env;
     EXPECT_NO_THROW(env = parseEnvelopeLenient(doc));
-    EXPECT_EQ(env.contractVersion, "1.0.0");
+    EXPECT_EQ(env.contractVersion, "0.1.0");
     EXPECT_EQ(env.kind, "validationResult");
     EXPECT_TRUE(env.payload.contains("passed"));
 }

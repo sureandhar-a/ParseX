@@ -138,8 +138,8 @@ nlohmann::json telemetryPayload() {
 nlohmann::json envelopeFor(const std::string& kind, nlohmann::json payload) {
     return nlohmann::json{
         {"$schema", "https://parsex.dev/schemas/v1/envelope.json"},
-        {"contractVersion", "1.0.0"},
-        {"toolVersion", "1.0.0"},
+        {"contractVersion", "0.1.0"},
+        {"toolVersion", "0.1.0"},
         {"kind", kind},
         {"payload", std::move(payload)},
     };

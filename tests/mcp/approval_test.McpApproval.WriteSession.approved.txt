@@ -11,7 +11,7 @@
     "resultType": "complete",
     "structuredContent": {
       "$schema": "https://parsex.dev/schemas/v1/envelope.json",
-      "contractVersion": "1.0.0",
+      "contractVersion": "0.1.0",
       "kind": "writeResult",
       "payload": {
         "applied": false,
@@ -19,7 +19,7 @@
         "output": "<tmp>/golden.arxml",
         "success": true
       },
-      "toolVersion": "1.0.0"
+      "toolVersion": "0.1.0"
     }
   }
 }
@@ -36,7 +36,7 @@
     "resultType": "complete",
     "structuredContent": {
       "$schema": "https://parsex.dev/schemas/v1/envelope.json",
-      "contractVersion": "1.0.0",
+      "contractVersion": "0.1.0",
       "kind": "writeResult",
       "payload": {
         "applied": true,
@@ -44,7 +44,7 @@
         "output": "<tmp>/golden.arxml",
         "success": true
       },
-      "toolVersion": "1.0.0"
+      "toolVersion": "0.1.0"
     }
   }
 }

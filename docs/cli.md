@@ -24,7 +24,7 @@ Run with --help for more information.
 | Flag | Type | Description | Config key |
 |------|------|-------------|------------|
 | `-h, --help` | — | Print help and exit (per-subcommand help via `parsex <sub> --help`). | — |
-| `-V, --version` | — | Print `libparsexVersion()` (currently `1.0.0`) and exit 0. Works without a subcommand; `parsex parse --version` is not supported (top-level flag only). | — |
+| `-V, --version` | — | Print `libparsexVersion()` (currently `0.1.0`) and exit 0. Works without a subcommand; `parsex parse --version` is not supported (top-level flag only). | — |
 | `--json` | flag | Emit machine-readable JSON instead of human-readable text. Must appear **before** the subcommand: `parsex --json parse …` is accepted; `parsex parse --json …` is rejected. When set, stdout is a single JSON envelope per the JSON Output Contract; logs and `--trace` go to stderr. | — |
 | `--no-color` | flag | Disable colored output. Human formatters gate any future ANSI codes behind `colorEnabled(--no-color, NO_COLOR, isatty)`. Also disabled when `NO_COLOR` is set in the environment (any value, per [no-color.org](https://no-color.org)) or when stdout is not a TTY. | — |
 | `--trace` | flag | Emit a `telemetryReport` JSON payload (kind `telemetryReport`) to **stderr** for the invocation. Each subcommand creates one root `ScopedSpan` (`parsex-cli.<subcommand>`) with child spans from the engines (Parser, Validator, Diff, Write) via `PARSEX_SPAN`. With `--json` the two streams stay separately parseable: stdout is the subcommand's envelope, stderr is the trace. | — |
@@ -152,7 +152,7 @@ parsex --json validate --input <file> [--strict]
 
   # --json variant (parseable)
   parsex --json validate --input tests/fixtures/schema_valid.arxml
-  # {"$schema":"…/envelope.json","contractVersion":"1.0.0","toolVersion":"1.0.0","kind":"validationResult","payload":{"errors":[],"passed":true}}
+  # {"$schema":"…/envelope.json","contractVersion":"0.1.0","toolVersion":"0.1.0","kind":"validationResult","payload":{"errors":[],"passed":true}}
 
   # strict: warnings-only file passes lenient, fails strict (demonstrated by unit test StrictModeTest)
   ```

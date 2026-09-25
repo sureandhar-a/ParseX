@@ -1,0 +1,7 @@
+#pragma once
+
+// Generated at configure time from the top-level CMake project VERSION — the
+// single source of truth for the ParseX version. Never edit this file
+// directly; bump the VERSION in the top-level CMakeLists.txt instead (plus
+// CHANGELOG.md and packaging manifests, per docs/versioning.md).
+#define PARSEX_VERSION "@PROJECT_VERSION@"

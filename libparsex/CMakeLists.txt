@@ -41,6 +41,11 @@ target_include_directories(libparsex PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_include_directories(libparsex INTERFACE include)
 
+# Generated version header (parsex/version_config.hpp) lives here; PUBLIC so
+# consumers of public headers that include it (json_contract/version.hpp)
+# resolve it too.
+target_include_directories(libparsex PUBLIC "${CMAKE_BINARY_DIR}/generated")
+
 # The library's own sources also include <parsex/...> (INTERFACE above only
 # applies to consumers).
 target_include_directories(libparsex PRIVATE include)

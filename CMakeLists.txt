@@ -5,7 +5,14 @@ if(DEFINED ENV{VCPKG_ROOT})
     set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
 endif()
 
-project(ParseX LANGUAGES CXX)
+project(ParseX VERSION 0.1.0 LANGUAGES CXX)
+
+# Single source of truth for the project version. Bumping the release means
+# editing the VERSION above (plus CHANGELOG.md and the packaging manifests,
+# per docs/versioning.md) — everything else derives from it at configure
+# time via the generated parsex/version_config.hpp header.
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/libparsex/include/parsex/version_config.hpp.in"
+               "${CMAKE_BINARY_DIR}/generated/parsex/version_config.hpp" @ONLY)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

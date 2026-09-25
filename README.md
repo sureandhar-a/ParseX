@@ -1,7 +1,7 @@
 # ParseX
 
 [![CI](https://github.com/sureandhar-a/ParseX/actions/workflows/ci.yml/badge.svg)](https://github.com/sureandhar-a/ParseX/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 ParseX is an ARXML parsing, validation, diffing, and safe editing toolkit built specifically for AUTOSAR XML semantics. Unlike a generic XML tool, it understands AUTOSAR schema versions through a shared schema registry and exposes the same core engine through both a scriptable command line and an assistant-facing server.

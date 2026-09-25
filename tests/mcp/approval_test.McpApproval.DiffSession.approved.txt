@@ -11,13 +11,13 @@
     "resultType": "complete",
     "structuredContent": {
       "$schema": "https://parsex.dev/schemas/v1/envelope.json",
-      "contractVersion": "1.0.0",
+      "contractVersion": "0.1.0",
       "kind": "diffReport",
       "payload": {
         "diagnostics": [],
         "entries": []
       },
-      "toolVersion": "1.0.0"
+      "toolVersion": "0.1.0"
     }
   }
 }
@@ -34,7 +34,7 @@
     "resultType": "complete",
     "structuredContent": {
       "$schema": "https://parsex.dev/schemas/v1/envelope.json",
-      "contractVersion": "1.0.0",
+      "contractVersion": "0.1.0",
       "kind": "diffReport",
       "payload": {
         "diagnostics": [],
@@ -335,7 +335,7 @@
           }
         ]
       },
-      "toolVersion": "1.0.0"
+      "toolVersion": "0.1.0"
     }
   }
 }

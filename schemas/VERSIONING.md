@@ -13,7 +13,7 @@ references it.
 * **patch** — documentation-only or non-schema-affecting fixes (typo in a
   description, example update, no validator-visible change).
 
-ParseX starts at `contractVersion: "1.0.0"` — there is no prior public JSON
+ParseX starts at `contractVersion: "0.1.0"` — there is no prior public JSON
 contract to be compatible with yet.
 
 Conceptual model adapted from Stripe's API versioning (dated major releases with

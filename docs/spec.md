@@ -112,7 +112,7 @@ Description: explicitly-confirmed tool for making validated edits.
  - Given a write is applied, when it runs, then the result is validated before persisting; a validation failure blocks the write and leaves the file untouched (FR-16, NFR-4).
 
 ### Feature: JSON output contract
-Status: Implemented — single envelope (`$schema`, `contractVersion` `1.0.0`, `kind`, `payload`, `toolVersion`) with kinds `parseReport`, `validationResult`, `diffReport`, `writeResult`, `telemetryReport`; optional fields use omit (see `schemas/`). The draft's `JSON_OUTPUT_SHAPE.md` field names are superseded.
+Status: Implemented — single envelope (`$schema`, `contractVersion` `0.1.0`, `kind`, `payload`, `toolVersion`) with kinds `parseReport`, `validationResult`, `diffReport`, `writeResult`, `telemetryReport`; optional fields use omit (see `schemas/`). The draft's `JSON_OUTPUT_SHAPE.md` field names are superseded.
 
 Description: the common response envelope used by both command line and assistant server.
 
