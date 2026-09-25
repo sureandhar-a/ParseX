@@ -40,6 +40,13 @@ jobs:
         run: cmake --build build/debug --parallel
       - name: Test
         run: ctest --test-dir build/debug --output-on-failure
+      - name: Coverage + floor
+        run: |
+          pip install gcovr || true
+          cmake -S . -B build/coverage -DPARSEX_ENABLE_COVERAGE=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/coverage --parallel
+          cmake --build build/coverage --target coverage
+          python3 scripts/check_coverage_floor.py
       - name: Package binaries
         run: cmake --install build/debug --prefix release-stage
       - name: Tarball

@@ -10,6 +10,8 @@ bump means.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-25
+
 ### Added
 
 - Shared schema registry resolving the AUTOSAR release per file to a local
