@@ -51,16 +51,20 @@ building — pick your platform's file from the
 [Releases page](https://github.com/sureandhar-a/ParseX/releases), unpack it,
 and run:
 
+- `parsex-v0.1.0-Linux.tar.gz` — Linux x86-64
+- `parsex-v0.1.0-macOS.tar.gz` — macOS arm64
+- `parsex-v0.1.0-Windows.tar.gz` — Windows x86-64
+
 ```bash
-tar xzf parsex-0.1.0-macos-latest.tar.gz
+tar xzf parsex-v0.1.0-macOS.tar.gz
 ./bin/parsex-cli --version
 # 0.1.0
 ./bin/parsex-cli parse --input share/parsex/examples/sample.arxml
 ```
 
 The tarball holds both binaries plus the first-run samples. It ships no
-AUTOSAR schemas (see Schemas above); parsing and validating the bundled
-samples needs none.
+AUTOSAR schemas (see Schemas above): parsing works immediately, while
+`validate` needs schemas fetched as described there.
 
 To build from source:
 
