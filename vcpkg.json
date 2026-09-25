@@ -1,13 +1,13 @@
 {
-    "name": "parsex",
-    "version": "0.1.0",
-    "dependencies": [
-        "libxml2",
-        "nlohmann-json",
-        "json-schema-validator",
-        "cli11",
-        "gtest",
-        "boost-pfr",
-        "approval-tests-cpp"
-    ]
+  "name": "parsex",
+  "version": "0.1.0",
+  "dependencies": [
+    "approval-tests-cpp",
+    "boost-pfr",
+    "cli11",
+    "gtest",
+    "json-schema-validator",
+    "libxml2",
+    "nlohmann-json"
+  ]
 }

@@ -51,3 +51,27 @@ target_link_libraries(myapp PRIVATE libparsex)
 This builds the library from source with the consumer's own toolchain and
 skips the port entirely. Disable unneeded components to keep the build lean:
 `-DPARSEX_BUILD_CLI=OFF -DPARSEX_BUILD_MCP=OFF -DPARSEX_BUILD_TESTS=OFF`.
+
+## Validating the port (manual step)
+
+Run this whenever `ports/libparsex/` changes. There is no CI job for it:
+validation needs the release tag to exist (see below), so it stays a manual
+maintainer step for v1.
+
+```bash
+mkdir -p ~/portcheck && cd ~/portcheck
+printf '{\n  "name": "portcheck",\n  "version": "0.0.0",\n  "dependencies": ["libparsex"]\n}\n' > vcpkg.json
+printf '{\n  "overlay-ports": ["<path-to-ParseX>/ports"]\n}\n' > vcpkg-configuration.json
+vcpkg install --triplet <your-triplet>
+```
+
+Also keep manifests canonical:
+
+```bash
+vcpkg format-manifest vcpkg.json ports/libparsex/vcpkg.json
+```
+
+Note: the port fetches the `vX.Y.Z` release tag, so a full install only
+succeeds once that tag exists. Pin the tag's real `SHA512` into
+`ports/libparsex/portfile.cmake` (replacing the placeholder) as part of
+cutting any release — the pre-release checklist covers this.
