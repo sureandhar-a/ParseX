@@ -9,6 +9,11 @@ Status: reconciled against as-built system (see status callouts per section)
 > assistant server. Where the original draft named a different command, tool,
 > or file, the as-built name is given inline. Claims with no shipped
 > counterpart are kept and marked Planned rather than deleted.
+>
+> Document map: this file is what/why (requirements and scope). `hld.md` is
+> components and data flow. `lld.md` is header-verified interfaces plus
+> original per-component design. Put new requirements here, new structure in
+> `hld.md`, new interfaces in `lld.md`.
 
 ## Problem
 

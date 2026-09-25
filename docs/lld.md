@@ -4,6 +4,16 @@ Last updated: 2026-09-25
 Status: reconciled — interface reference below verified against public headers
 Based on: hld.md
 
+> Document map: `spec.md` is what/why (requirements and scope). `hld.md` is
+> components and data flow. This file is header-verified interfaces (reference
+> above) plus original per-component design below. Put new requirements in
+> `spec.md`, new structure in `hld.md`, new interfaces in the reference above.
+>
+> Note: per-component sections below are the original design pass and may name
+> superseded sub-blocks (byte splicer, export writer, network fetch). The
+> header-verified reference above is authoritative for the as-built system;
+> historical sub-block names below are design history, not current terminology.
+
 ## Public interface reference (header-verified)
 
 Reference only — signatures plus one-line purpose. Design rationale lives in

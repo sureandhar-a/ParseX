@@ -4,6 +4,11 @@ Last updated: 2026-09-25
 Status: reconciled against as-built system
 Based on: spec.md
 
+> Document map: `spec.md` is what/why (requirements and scope). This file is
+> components and data flow. `lld.md` is header-verified interfaces plus
+> original per-component design. Put new requirements in `spec.md`, new
+> structure here, new interfaces in `lld.md`.
+
 ## 1. System overview
 
 Diagrams are Mermaid kept in this file so the design stays readable and
@@ -57,7 +62,7 @@ graph TD
         end
 
         subgraph WriteEngine[Write Engine]
-            WEngine[Deterministic Writer] --> WValidate[Write Validation]
+            WEngine[Write Engine] --> WValidate[Write Validation]
         end
 
         subgraph JSONContract[JSON Output Contract]
@@ -121,7 +126,7 @@ on stderr via `--trace`, not an inline timing field.
 2. **Renderers** — deterministic human text plus JSON report via the shared envelope.
 
 ### Write Engine
-1. **Deterministic Writer** — rebuilds schema-valid output from the typed model with stable ordering and pretty printing. Not a byte splicer: comments and unmodeled content are not preserved (see README limitations).
+1. **Write Engine** — rebuilds schema-valid output from the typed model with stable ordering and pretty printing. Not a byte splicer: comments and unmodeled content are not preserved (see README limitations).
 2. **Write validation + atomic output** — validates before persisting and writes via temp-then-rename so a failure leaves the original intact.
 
 ### JSON Output Contract
