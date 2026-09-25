@@ -126,3 +126,6 @@ add_test(NAME cli.precedence.combined_flag_wins
     COMMAND bash -c "cfg=$(mktemp /tmp/parsex_precedence_combined_XXXX.toml); echo 'schema-cache-dir=\"/tmp/cli-config-combined\"' > \"$cfg\"; out=$(PARSEX_SCHEMA_CACHE_DIR=/tmp/cli-env-combined \"$0\" --schema-cache-dir /tmp/cli-flag-combined --config \"$cfg\" parse --input \"${CMAKE_SOURCE_DIR}/tests/fixtures/schema_valid.arxml\" 2>&1); echo \"$out\"; echo \"$out\" | grep -q \"schema-cache-dir=/tmp/cli-flag-combined (flag)\"; rc=$?; rm -f \"$cfg\"; test $rc -eq 0" $<TARGET_FILE:parsex-cli>)
 set_tests_properties(cli.precedence.combined_flag_wins PROPERTIES
     PASS_REGULAR_EXPRESSION "schema-cache-dir=/tmp/cli-flag-combined \\(flag\\)")
+# Install the executable so release tarballs ship a runnable binary.
+include(GNUInstallDirs)
+install(TARGETS parsex-cli RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

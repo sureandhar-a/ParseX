@@ -10,6 +10,11 @@ This document is kept in sync with the actual `tools/list` output — no documen
 
 The server speaks newline-delimited JSON-RPC over standard streams. Stdout is reserved for protocol messages only; diagnostics go to stderr.
 
+Get the binary either by downloading a release tarball (see
+[Build](../README.md#build) — unpack and use `bin/parsex-mcp`) or by
+building from source (`build/debug/parsex-mcp/parsex-mcp`). Either way,
+point the client at the binary:
+
 Example assistant config entry (Claude Code / Claude Desktop style):
 
 ```json
@@ -24,7 +29,7 @@ Example assistant config entry (Claude Code / Claude Desktop style):
 }
 ```
 
-Manual smoke check:
+Manual smoke check (adjust the path for a release download):
 
 ```sh
 printf '{"jsonrpc":"2.0","id":1,"method":"server/discover"}\n' | ./build/debug/parsex-mcp/parsex-mcp

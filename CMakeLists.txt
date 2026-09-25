@@ -81,6 +81,12 @@ if(PARSEX_ENABLE_FUZZING)
     add_subdirectory(fuzz)
 endif()
 
+# First-run samples ship with the binaries so a release tarball is usable
+# on its own (schemas stay user-supplied and are never bundled).
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/examples/"
+        DESTINATION "share/parsex/examples"
+        FILES_MATCHING PATTERN "*.arxml")
+
 # User-supplied AUTOSAR XSD schemas (see resources/schemas/README.md).
 # The .xsd files are copyrighted, gitignored, and provided by each user — the
 # repo tracks only the layout. Whatever *.xsd files are present locally ship
