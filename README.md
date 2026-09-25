@@ -117,8 +117,29 @@ Note: richer study-vocabulary fixtures such as `tests/fixtures/parsefile_complet
 
 ## Documentation
 
+- [Requirements and scope](docs/spec.md) — what the toolkit covers and why.
+- [High-level design](docs/hld.md) — components and data flow.
+- [Low-level design](docs/lld.md) — per-component interfaces.
+- [Command-line reference](docs/cli.md) — every flag, subcommand, and exit code.
+- [Assistant server reference](docs/mcp.md) — tools, protocol version, and launch config.
+- [Testing guide](docs/testing.md) — how to run unit, sanitizer, fuzz, stability, and coverage checks.
 - [Shared types module reference](docs/shared-types.md) — the domain types, containers, and protocol-extension variant: which file to open for what.
 - [Schema Registry module reference](docs/schema-registry.md) — schema sources, disk cache, shared-handle contract, and the redistribution caveat.
+- [Output contract versioning](schemas/VERSIONING.md) — how report shapes evolve.
+- [Design decisions](docs/decisions/) — composition over inheritance, vendored schemas, byte-offset tracking.
+
+## Repository layout
+
+- `libparsex/` — core C++ library (parsing, validation, comparison, writing, shared output, timing).
+- `parsex-cli/` — scriptable command-line surface around the core library.
+- `parsex-mcp/` — assistant-facing server around the same core library.
+- `tests/` — unit and hardening checks with shared fixtures.
+- `fuzz/` — libFuzzer harnesses and seed corpus.
+- `docs/` — user and design documentation.
+- `examples/` — small runnable samples for the first-run walkthrough.
+- `schemas/` — versioned report shapes and output contract notes.
+- `scripts/` — setup, coverage, and maintenance helpers.
+- `resources/` — user-supplied schema layout and notes.
 
 ## Known limitations (Write Engine)
 
