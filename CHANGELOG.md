@@ -10,6 +10,14 @@ bump means.
 
 ## [Unreleased]
 
+### Added
+
+- Token-efficiency benchmarks: `docs/token-efficiency.md` (MCP, frozen
+  methodology, v0.1.0 baseline, third-party real-file measurements)
+  and `docs/cli-efficiency.md` (per-command test evidence plus
+  memory/time/usability analysis), plus
+  `scripts/measure_tokens.py` repro harness and a README highlight.
+
 ## [0.1.0] - 2026-09-25
 
 ### Added

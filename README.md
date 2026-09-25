@@ -133,6 +133,22 @@ build/debug/parsex-cli/parsex-cli --json parse --input examples/sample.arxml
 
 Note: richer study-vocabulary fixtures such as `tests/fixtures/parsefile_complete.arxml` parse with real domain counts but intentionally fail official-schema validation. That gap is documented under Known limitations below.
 
+## Why ParseX saves tokens
+
+A real 736 KB CAN matrix (1,162 signals, from
+[canmatrix](https://github.com/ebroecker/canmatrix)) costs ~208,182
+tokens pasted raw — more than GPT-4o's whole context; ParseX `parse`
+answers in 193 tokens (**1,078×** less). On the bundled 71 KB fixture:
+209 (`parse`, **105.5×**), 1,546 (`diff`, **14.3×**), 10,002
+(`validate` on a noisy 87-finding file, **2.2×**). All four tool
+definitions total 640 tokens. Measured with `tiktoken o200k_base`
+against the built binary — methodology, full tables incl. third-party
+files, and repro steps:
+[docs/token-efficiency.md](docs/token-efficiency.md). What the CLI
+gives you, the test results proving it, and why it is different on
+memory, time, and usability:
+[docs/cli-efficiency.md](docs/cli-efficiency.md).
+
 ## Documentation
 
 - [Requirements and scope](docs/spec.md) — what the toolkit covers and why.
@@ -140,6 +156,8 @@ Note: richer study-vocabulary fixtures such as `tests/fixtures/parsefile_complet
 - [Low-level design](docs/lld.md) — per-component interfaces.
 - [Command-line reference](docs/cli.md) — every flag, subcommand, and exit code.
 - [Assistant server reference](docs/mcp.md) — tools, protocol version, and launch config.
+- [Token efficiency](docs/token-efficiency.md) — measured MCP context savings with repro steps.
+- [CLI proof](docs/cli-efficiency.md) — what each command gives you, the tests proving it, and memory/time/usability.
 - [Testing guide](docs/testing.md) — how to run unit, sanitizer, fuzz, stability, and coverage checks.
 - [Shared types module reference](docs/shared-types.md) — the domain types, containers, and protocol-extension variant: which file to open for what.
 - [Schema Registry module reference](docs/schema-registry.md) — schema sources, disk cache, shared-handle contract, and the redistribution caveat.
