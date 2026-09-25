@@ -18,6 +18,11 @@ ParseX is for engineers working with AUTOSAR Classic Platform files who need tru
 
 ## Prerequisites
 
+- A recent C++20 compiler (Clang or GCC — continuous integration covers Ubuntu, macOS, and Windows).
+- CMake 3.21 or newer.
+- Ninja build tool (the configured presets use the Ninja generator).
+- vcpkg is vendored as a submodule — clone with `--recurse-submodules` so dependency resolution works for the core XML, JSON, and command-line libraries.
+
 On macOS, install the host build tool `pkg-config` before running CMake/vcpkg:
 
 ```bash
@@ -41,12 +46,17 @@ and the manual fallback.
 
 ## Build
 
-Using the CMake preset:
-
 ```bash
+git clone --recurse-submodules https://github.com/sureandhar-a/ParseX.git
+cd ParseX
 cmake --preset default
 cmake --build --preset default
 ```
+
+This produces two working binaries:
+
+- `build/debug/parsex-cli/parsex-cli` — the scriptable command line
+- `build/debug/parsex-mcp/parsex-mcp` — the assistant-facing server
 
 Run tests with the preset:
 
@@ -56,6 +66,12 @@ ctest --preset default
 
 Full testing strategy (unit, sanitizers, fuzz, stability, shared output,
 slow, coverage): [docs/testing.md](docs/testing.md).
+
+Optional build flags (see the testing guide for when to use each):
+
+- `PARSEX_ENABLE_SANITIZERS` — address and undefined-behavior checks
+- `PARSEX_ENABLE_FUZZING` — libFuzzer harnesses (needs Clang with the runtime)
+- `PARSEX_ENABLE_COVERAGE` — coverage instrumentation for the floor-guarded report
 
 You can also build the release preset:
 
