@@ -1,5 +1,20 @@
 # ParseX
-ParseX — a protocol-agnostic ARXML (AUTOSAR XML) parsing, validation, diffing, and safe editing toolkit, covering the full CAN communication stack on AUTOSAR Classic Platform (releases 4.2.2 through R21-11).
+
+[![CI](https://github.com/sureandhar-a/ParseX/actions/workflows/ci.yml/badge.svg)](https://github.com/sureandhar-a/ParseX/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
+ParseX is an ARXML parsing, validation, diffing, and safe editing toolkit built specifically for AUTOSAR XML semantics. Unlike a generic XML tool, it understands AUTOSAR schema versions through a shared schema registry and exposes the same core engine through both a scriptable command line and an assistant-facing server.
+
+ParseX is for engineers working with AUTOSAR Classic Platform files who need trustworthy automation: parsing files into a typed domain model, validating them against official schemas and CAN rules, comparing two files structurally, and writing changes back safely with a dry-run by default.
+
+## Contents
+
+- [Quickstart](#prerequisites)
+- [Building](#build)
+- [Documentation](#documentation)
+- [Contributing](CONTRIBUTING.md)
+- [License](#license)
 
 ## Prerequisites
 
@@ -65,3 +80,7 @@ home (ECU channel refs, frame transmitters, signal receivers/value tables)
 are likewise dropped. This mirrors the `autosar-data` crate's own
 non-passthrough design and is covered by explicit tests, not discovered by
 accident.
+
+## License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
