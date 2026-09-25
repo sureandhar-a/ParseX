@@ -2,6 +2,8 @@
 
 #include <string_view>
 
+#include <parsex/version_config.hpp>
+
 std::string_view libparsexVersion() {
-    return "1.0.0";
+    return PARSEX_VERSION;
 }

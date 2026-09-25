@@ -23,8 +23,8 @@ fs::path envelopeSchema() {
 nlohmann::json validValidationEnvelope() {
     return nlohmann::json{
         {"$schema", "https://parsex.dev/schemas/v1/envelope.json"},
-        {"contractVersion", "1.0.0"},
-        {"toolVersion", "1.0.0"},
+        {"contractVersion", "0.1.0"},
+        {"toolVersion", "0.1.0"},
         {"kind", "validationResult"},
         {"payload", nlohmann::json{{"passed", true}, {"errors", nlohmann::json::array()}}},
     };

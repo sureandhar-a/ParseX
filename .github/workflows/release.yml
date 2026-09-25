@@ -1,0 +1,80 @@
+# Tag-triggered release: build, verify, publish.
+# Pushing a vX.Y.Z tag (annotated, on the version-bump commit) runs the same
+# build and test commands as the CI pipeline's build stage first — a red
+# build fails the workflow before anything publishes. Only a green verify
+# reaches the publish job, which attaches per-platform binaries and notes
+# assembled from the CHANGELOG dated section matching the tag.
+name: Release
+on:
+  push:
+    tags: ["v*.*.*"]
+permissions:
+  contents: write
+jobs:
+  verify:
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg-archives,readwrite"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - name: Bootstrap vcpkg (Unix)
+        if: runner.os != 'Windows'
+        run: ./vcpkg/bootstrap-vcpkg.sh
+      - name: Bootstrap vcpkg (Windows)
+        if: runner.os == 'Windows'
+        run: ./vcpkg/bootstrap-vcpkg.bat
+      - name: Configure (Unix)
+        if: runner.os != 'Windows'
+        run: cmake --preset default
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: cmake --preset default -DVCPKG_TARGET_TRIPLET=x64-mingw-static
+      - name: Build
+        run: cmake --build build/debug --parallel
+      - name: Test
+        run: ctest --test-dir build/debug --output-on-failure
+      - name: Coverage + floor
+        run: |
+          pip install gcovr || true
+          cmake -S . -B build/coverage -DPARSEX_ENABLE_COVERAGE=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/coverage --parallel
+          cmake --build build/coverage --target coverage
+          python3 scripts/check_coverage_floor.py
+      - name: Package binaries
+        run: cmake --install build/debug --prefix release-stage
+      - name: Tarball
+        run: tar czf parsex-${{ github.ref_name }}-${{ runner.os }}.tar.gz -C release-stage .
+      - uses: actions/upload-artifact@v5
+        with:
+          name: parsex-${{ github.ref_name }}-${{ runner.os }}
+          path: parsex-${{ github.ref_name }}-${{ runner.os }}.tar.gz
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          path: artifacts
+      - name: Extract changelog section
+        id: notes
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          awk -v ver="$TAG" '
+            $0 ~ "^## \\[" ver "\\]" {flag=1; next}
+            /^## \[/ {flag=0}
+            flag {print}
+          ' CHANGELOG.md > release-notes.md
+          test -s release-notes.md
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*.tar.gz
+          body_path: release-notes.md

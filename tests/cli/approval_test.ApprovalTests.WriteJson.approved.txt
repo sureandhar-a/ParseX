@@ -1,6 +1,6 @@
 {
   "$schema": "https://parsex.dev/schemas/v1/envelope.json",
-  "contractVersion": "1.0.0",
+  "contractVersion": "0.1.0",
   "kind": "writeResult",
   "payload": {
     "applied": false,
@@ -8,6 +8,6 @@
     "output": "/tmp/parsex_approval_write.arxml",
     "success": true
   },
-  "toolVersion": "1.0.0"
+  "toolVersion": "0.1.0"
 }
 

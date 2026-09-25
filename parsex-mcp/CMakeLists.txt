@@ -41,3 +41,7 @@ add_test(NAME protocol.pipe_cancel_after_complete
     COMMAND bash -c "out=$(printf '{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/list\"}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":3}}\n' | \"$0\" 2>/dev/null); echo \"$out\"; echo \"$out\" | python3 -c 'import json,sys; docs=[json.loads(l) for l in sys.stdin.read().strip().splitlines()]; assert len(docs)==1 and docs[0][\"id\"]==3'" $<TARGET_FILE:parsex-mcp>)
 set_tests_properties(protocol.pipe_cancel_after_complete PROPERTIES
     PASS_REGULAR_EXPRESSION "\"id\":3")
+
+# Install the executable so release tarballs ship a runnable server.
+include(GNUInstallDirs)
+install(TARGETS parsex-mcp RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

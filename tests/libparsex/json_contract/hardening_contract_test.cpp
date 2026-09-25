@@ -99,7 +99,7 @@ TEST(SpanNestingTest, NestedEnginesStayDistinct) {
 TEST(VersionConsistencyTest, SurfacesShareVersions) {
     // Both surfaces wrap the same core: single constants, never per-surface
     // literals. A stale build fails here.
-    EXPECT_EQ(std::string(parsex::json_contract::kContractVersion), "1.0.0");
+    EXPECT_EQ(std::string(parsex::json_contract::kContractVersion), "0.1.0");
     EXPECT_FALSE(std::string(libparsexVersion()).empty());
     const nlohmann::json cliLike =
         parsex::json_contract::wrapEnvelope("parseReport", {{"ok", true}});

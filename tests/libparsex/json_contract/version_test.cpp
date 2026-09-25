@@ -10,5 +10,5 @@ TEST(ContractVersionTest, ParsesAsValidSemver) {
     static const std::regex kSemver(R"(^\d+\.\d+\.\d+$)");
     const std::string version{parsex::json_contract::kContractVersion};
     EXPECT_TRUE(std::regex_match(version, kSemver)) << version;
-    EXPECT_EQ(version, "1.0.0");
+    EXPECT_EQ(version, "0.1.0");
 }
