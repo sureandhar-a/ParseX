@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AUTOSAR xmlns="http://autosar.org/schema/r4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://autosar.org/schema/r4.0 AUTOSAR_4-2-2.xsd">
+  <!-- Small first-run sample: valid against the official AUTOSAR 4.2.2 schema.
+       Aligned with tests/fixtures/schema_valid.arxml so there is only one
+       schema-valid shape to maintain. Richer study-vocabulary fixtures such
+       as tests/fixtures/parsefile_complete.arxml parse with real counts but
+       intentionally fail official-schema validation (see README limitations). -->
+  <AR-PACKAGES>
+    <AR-PACKAGE>
+      <SHORT-NAME>SampleSystem</SHORT-NAME>
+    </AR-PACKAGE>
+    <AR-PACKAGE>
+      <SHORT-NAME>SampleCommon</SHORT-NAME>
+    </AR-PACKAGE>
+  </AR-PACKAGES>
+</AUTOSAR>

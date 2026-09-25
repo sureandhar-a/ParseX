@@ -80,6 +80,41 @@ cmake --preset release
 cmake --build --preset release
 ```
 
+## First run
+
+Parse the bundled sample and validate it. All commands below were run against the current build and show real output:
+
+```bash
+build/debug/parsex-cli/parsex-cli parse --input examples/sample.arxml
+# Parsed examples/sample.arxml
+#   release: 4.2.2
+#   clusters: 0
+#   ecuInstances: 0
+#   frames: 0
+#   pdus: 0
+#   signals: 0
+#   signalGroups: 0
+
+build/debug/parsex-cli/parsex-cli validate --input examples/sample.arxml --strict
+# Validation passed (0 issues)
+```
+
+See what a failure looks like with the deliberately broken companion file:
+
+```bash
+build/debug/parsex-cli/parsex-cli validate --input examples/sample_invalid.arxml
+# Validation failed (1 issues)
+#   [error] schema.invalid: Element '{http://autosar.org/schema/r4.0}AR-PACKAGE': Missing child element(s). Expected is ( ... SHORT-NAME ).
+```
+
+For machine-readable output, put `--json` before the subcommand (see [command-line reference](docs/cli.md) for the full shape — the schema itself lives with the output contract and is not repeated here):
+
+```bash
+build/debug/parsex-cli/parsex-cli --json parse --input examples/sample.arxml
+```
+
+Note: richer study-vocabulary fixtures such as `tests/fixtures/parsefile_complete.arxml` parse with real domain counts but intentionally fail official-schema validation. That gap is documented under Known limitations below.
+
 ## Documentation
 
 - [Shared types module reference](docs/shared-types.md) — the domain types, containers, and protocol-extension variant: which file to open for what.
