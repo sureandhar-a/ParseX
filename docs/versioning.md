@@ -117,8 +117,8 @@ against the current tree so nothing here is assumed.
    automation trigger on the same string.
 
 Do not tag or publish from this process alone — tagging belongs to the
-pre-release checklist, which re-verifies the gates below before anything is
-cut.
+pre-release checklist (`docs/release-checklist.md`), which re-verifies the
+gates below before anything is cut.
 
 ## Release gates
 
