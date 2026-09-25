@@ -1,0 +1,13 @@
+{
+  "name": "libparsex",
+  "version": "0.1.0",
+  "description": "ARXML parsing, validation, diffing, and safe editing core library",
+  "homepage": "https://github.com/sureandhar-a/ParseX",
+  "license": "Apache-2.0",
+  "dependencies": [
+    "boost-pfr",
+    "json-schema-validator",
+    "libxml2",
+    "nlohmann-json"
+  ]
+}
