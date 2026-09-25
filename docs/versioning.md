@@ -93,6 +93,33 @@ hardening and this documentation and release work are complete and stable.
 After `1.0.0`, the standard SemVer rules apply with no carve-out: breaking
 changes require a major bump.
 
+## Bumping the version (maintainer process)
+
+Follow these steps in order ahead of any release. Each step was dry-run
+against the current tree so nothing here is assumed.
+
+1. Decide the new version using the bump table above.
+2. Edit the single version source: the `VERSION` in the top-level
+   `CMakeLists.txt` `project(...)` declaration. Reconfigure so the
+   generated `parsex/version_config.hpp` picks it up, then confirm the
+   command line `--version`, a report envelope's `toolVersion` /
+   `contractVersion`, and the packaging manifest all report the new value.
+3. Move `CHANGELOG.md`'s `## [Unreleased]` content into a new dated
+   `## [x.y.z] - YYYY-MM-DD` section, leaving an empty `## [Unreleased]`
+   behind for the next cycle.
+4. Update the `"version"` field in the packaging manifests (`vcpkg.json`,
+   and the overlay port manifest once it exists) to the same value.
+5. Commit the version source, changelog, and manifest changes together as
+   one commit (`chore: bump version to x.y.z`).
+6. Tag the bump commit as `vX.Y.Z` (annotated tag). The tag format and the
+   notes template are defined in the release process; this process and that
+   one agree on `vX.Y.Z` so the port file fetch reference and the release
+   automation trigger on the same string.
+
+Do not tag or publish from this process alone — tagging belongs to the
+pre-release checklist, which re-verifies the gates below before anything is
+cut.
+
 ## Release gates
 
 A version bump is only half the release. Before cutting any release, the
