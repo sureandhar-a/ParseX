@@ -116,6 +116,20 @@ against the current tree so nothing here is assumed.
    one agree on `vX.Y.Z` so the port file fetch reference and the release
    automation trigger on the same string.
 
+## Tag convention and release notes
+
+Tags are `vX.Y.Z` (e.g. `v0.1.0`), annotated only (`git tag -a`), placed on
+the version-bump commit from the process above — never on a random commit.
+The same `vX.Y.Z` string is what `ports/libparsex/portfile.cmake` fetches
+via its `REF` and what the release automation triggers on, so all three
+agree by construction.
+
+Release notes follow `.github/RELEASE_TEMPLATE.md`: hand-written Highlights,
+Changes pasted from the changelog's dated section, Upgrading notes when the
+bump table says the release breaks anything (see above), plus a link back to
+the full changelog. The automation pre-fills Changes from the changelog; a
+human writes Highlights and Upgrading.
+
 Do not tag or publish from this process alone — tagging belongs to the
 pre-release checklist (`docs/release-checklist.md`), which re-verifies the
 gates below before anything is cut.
