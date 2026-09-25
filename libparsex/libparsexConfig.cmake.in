@@ -1,0 +1,9 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(LibXml2)
+find_dependency(nlohmann_json)
+find_dependency(nlohmann_json_schema_validator)
+find_dependency(boost_pfr)
+
+include("${CMAKE_CURRENT_LIST_DIR}/libparsexTargets.cmake")

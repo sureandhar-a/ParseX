@@ -36,18 +36,16 @@ add_library(libparsex STATIC
     src/write/write_engine.cpp
 )
 
-# Tell targets linking against libparsex where to find its header files
-target_include_directories(libparsex PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+# Tell targets linking against libparsex where to find its header files.
+# Generator expressions keep build-tree paths out of the installed export so
+# `cmake --install` (and the packaging port) works.
+target_include_directories(libparsex PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
-target_include_directories(libparsex INTERFACE include)
-
-# Generated version header (parsex/version_config.hpp) lives here; PUBLIC so
-# consumers of public headers that include it (json_contract/version.hpp)
-# resolve it too.
-target_include_directories(libparsex PUBLIC "${CMAKE_BINARY_DIR}/generated")
-
-# The library's own sources also include <parsex/...> (INTERFACE above only
-# applies to consumers).
+# The library's own sources also include <parsex/...>.
 target_include_directories(libparsex PRIVATE include)
 
 # Baked-in schema source fallbacks for resolveSchema(): the install default
@@ -68,3 +66,33 @@ find_package(boost_pfr CONFIG REQUIRED)
 target_link_libraries(libparsex PUBLIC LibXml2::LibXml2 nlohmann_json::nlohmann_json
                                        nlohmann_json_schema_validator::validator
                                        Boost::pfr)
+
+# Install + CMake package config so downstream projects can
+# `find_package(libparsex CONFIG REQUIRED)` and link `libparsex::libparsex`.
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+install(TARGETS libparsex parsex_sanitizers parsex_coverage EXPORT libparsexTargets
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(FILES "${CMAKE_BINARY_DIR}/generated/parsex/version_config.hpp"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/parsex")
+
+install(EXPORT libparsexTargets
+        FILE libparsexTargets.cmake
+        NAMESPACE libparsex::
+        DESTINATION "share/libparsex")
+
+configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/libparsexConfig.cmake.in"
+                              "${CMAKE_BINARY_DIR}/libparsexConfig.cmake"
+                              INSTALL_DESTINATION "share/libparsex")
+write_basic_package_version_file("${CMAKE_BINARY_DIR}/libparsexConfigVersion.cmake"
+                                 VERSION "${PROJECT_VERSION}"
+                                 COMPATIBILITY SameMajorVersion)
+install(FILES "${CMAKE_BINARY_DIR}/libparsexConfig.cmake"
+              "${CMAKE_BINARY_DIR}/libparsexConfigVersion.cmake"
+        DESTINATION "share/libparsex")

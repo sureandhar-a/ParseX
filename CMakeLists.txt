@@ -32,10 +32,47 @@ include(CTest)
 # Enable testing in the root so CTest can find all tests
 enable_testing()
 
+# Component toggles so the core library builds standalone (a packaging
+# consumer needs libparsex only — no command-line or server dependencies).
+option(PARSEX_BUILD_CLI "Build the parsex-cli executable" ON)
+option(PARSEX_BUILD_MCP "Build the parsex-mcp executable" ON)
+option(PARSEX_BUILD_TESTS "Build the test suite" ON)
+
+# Interface option carriers. Defined before any subdirectory so every target
+# (and every install export set) can reference them regardless of which
+# components are enabled.
+option(PARSEX_ENABLE_SANITIZERS "Build with ASan+UBSan instrumentation" OFF)
+option(PARSEX_ENABLE_COVERAGE "Build with coverage instrumentation (gcov/llvm-cov)" OFF)
+
+add_library(parsex_sanitizers INTERFACE)
+if(PARSEX_ENABLE_SANITIZERS)
+  target_compile_options(parsex_sanitizers INTERFACE
+    -fsanitize=address,undefined
+    -fno-omit-frame-pointer
+    -fno-sanitize-recover=all)
+  target_link_options(parsex_sanitizers INTERFACE
+    -fsanitize=address,undefined)
+endif()
+
+# Coverage: opt-in only, never on by default. Uses --coverage (GCC/gcov and
+# Clang both accept it; Clang pairs with llvm-cov/llvm-profdata for reports,
+# GCC with gcovr). Applied to the core library; tools link it transitively.
+add_library(parsex_coverage INTERFACE)
+if(PARSEX_ENABLE_COVERAGE)
+  target_compile_options(parsex_coverage INTERFACE --coverage -O0 -g)
+  target_link_options(parsex_coverage INTERFACE --coverage)
+endif()
+
 add_subdirectory(libparsex)
-add_subdirectory(parsex-cli)
-add_subdirectory(parsex-mcp)
-add_subdirectory(tests)
+if(PARSEX_BUILD_CLI)
+    add_subdirectory(parsex-cli)
+endif()
+if(PARSEX_BUILD_MCP)
+    add_subdirectory(parsex-mcp)
+endif()
+if(PARSEX_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
 
 # libFuzzer harness (off by default: needs Clang with the libFuzzer runtime —
 # Homebrew LLVM on macOS, not Xcode CLT; see fuzz/fuzz_parser.cpp).
@@ -60,35 +97,14 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/schemas")
          FILES_MATCHING PATTERN "*.xsd")
 endif()
 
-option(PARSEX_ENABLE_SANITIZERS "Build with ASan+UBSan instrumentation" OFF)
-
-option(PARSEX_ENABLE_COVERAGE "Build with coverage instrumentation (gcov/llvm-cov)" OFF)
-
 option(PARSEX_ENABLE_TELEMETRY "Compile in ParseX's telemetry instrumentation" ON)
 if(NOT PARSEX_ENABLE_TELEMETRY)
     add_compile_definitions(PARSEX_TELEMETRY_DISABLED)
 endif()
 
-add_library(parsex_sanitizers INTERFACE)
-if(PARSEX_ENABLE_SANITIZERS)
-  target_compile_options(parsex_sanitizers INTERFACE
-    -fsanitize=address,undefined
-    -fno-omit-frame-pointer
-    -fno-sanitize-recover=all)
-  target_link_options(parsex_sanitizers INTERFACE
-    -fsanitize=address,undefined)
-endif()
-
 target_link_libraries(libparsex PUBLIC parsex_sanitizers)
 
-# Coverage: opt-in only, never on by default. Uses --coverage (GCC/gcov and
-# Clang both accept it; Clang pairs with llvm-cov/llvm-profdata for reports,
-# GCC with gcovr). Applied to the core library; tools link it transitively.
-add_library(parsex_coverage INTERFACE)
-if(PARSEX_ENABLE_COVERAGE)
-  target_compile_options(parsex_coverage INTERFACE --coverage -O0 -g)
-  target_link_options(parsex_coverage INTERFACE --coverage)
-endif()
+# Coverage: opt-in only, never on by default (libraries defined above).
 target_link_libraries(libparsex PUBLIC parsex_coverage)
 
 # Coverage report: runs the suite (excluding slow + fuzz loops, which distort

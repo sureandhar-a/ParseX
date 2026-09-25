@@ -107,8 +107,8 @@ against the current tree so nothing here is assumed.
 3. Move `CHANGELOG.md`'s `## [Unreleased]` content into a new dated
    `## [x.y.z] - YYYY-MM-DD` section, leaving an empty `## [Unreleased]`
    behind for the next cycle.
-4. Update the `"version"` field in the packaging manifests (`vcpkg.json`,
-   and the overlay port manifest once it exists) to the same value.
+4. Update the `"version"` field in the packaging manifests (`vcpkg.json`
+   and `ports/libparsex/vcpkg.json`) to the same value.
 5. Commit the version source, changelog, and manifest changes together as
    one commit (`chore: bump version to x.y.z`).
 6. Tag the bump commit as `vX.Y.Z` (annotated tag). The tag format and the
