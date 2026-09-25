@@ -126,6 +126,7 @@ Note: richer study-vocabulary fixtures such as `tests/fixtures/parsefile_complet
 - [Shared types module reference](docs/shared-types.md) — the domain types, containers, and protocol-extension variant: which file to open for what.
 - [Schema Registry module reference](docs/schema-registry.md) — schema sources, disk cache, shared-handle contract, and the redistribution caveat.
 - [Output contract versioning](schemas/VERSIONING.md) — how report shapes evolve.
+- [Consuming the core library](docs/vcpkg-usage.md) — overlay port and submodule options for downstream projects.
 - [Design decisions](docs/decisions/) — composition over inheritance, vendored schemas, byte-offset tracking.
 
 ## Repository layout
