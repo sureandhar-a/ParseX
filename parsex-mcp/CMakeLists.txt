@@ -42,6 +42,14 @@ add_test(NAME protocol.pipe_cancel_after_complete
 set_tests_properties(protocol.pipe_cancel_after_complete PROPERTIES
     PASS_REGULAR_EXPRESSION "\"id\":3")
 
+# Hostile-but-small input (100k-deep nesting, a huge unterminated id string)
+# used to overflow the stack; the server must reject it and keep serving.
+add_test(NAME transport.pipe_survives_hostile_input
+    COMMAND python3 "${CMAKE_SOURCE_DIR}/tests/mcp/pipe_hostile_input.py" $<TARGET_FILE:parsex-mcp>)
+set_tests_properties(transport.pipe_survives_hostile_input PROPERTIES
+    PASS_REGULAR_EXPRESSION "server survived hostile input"
+    TIMEOUT 120)
+
 # Install the executable so release tarballs ship a runnable server.
 include(GNUInstallDirs)
 install(TARGETS parsex-mcp RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

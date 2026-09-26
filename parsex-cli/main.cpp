@@ -180,7 +180,6 @@ int main(int argc, char const *argv[])
     // NOTE: set_version_flag on the top-level app only fires at the top level
     // by default (e.g. `parsex --version` works; `parsex parse --version` does
     // not unless each subcommand also sets its own version flag).
-    // TODO(PAR-207): document --version in docs/cli.md
     app.set_version_flag("--version,-V", std::string(libparsexVersion()));
 
     // Shared top-level options readable from every subcommand callback.
