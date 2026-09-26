@@ -65,7 +65,11 @@ std::string trimLeft(const std::string& s) {
 
 // PAR-215.1: --json output validates against the Output Contract schema.
 // Reuses PAR-165's validatesAgainstSchema() approach (not a regex).
+// Shell invocation via popen is POSIX-specific (see approval_test.cpp).
 TEST(CliJsonOutput, JsonValidateConformsToEnvelopeSchema) {
+#ifdef _WIN32
+    GTEST_SKIP() << "popen shell harness is POSIX-specific";
+#endif
 #ifdef _WIN32
     const std::string nullRedirect = " 2>NUL";
 #else
@@ -91,7 +95,11 @@ TEST(CliJsonOutput, JsonValidateConformsToEnvelopeSchema) {
 }
 
 // PAR-215.2: without --json, stdout is human-readable, not JSON.
+// Shell invocation via popen is POSIX-specific (see approval_test.cpp).
 TEST(CliJsonOutput, HumanOutputIsNotJson) {
+#ifdef _WIN32
+    GTEST_SKIP() << "popen shell harness is POSIX-specific";
+#endif
     // PAR-224: parse now calls real Parser; tiny_valid.arxml is unsupported
     // (4.0.0). Use a fixture that the Parser can actually handle.
     const fs::path parseFixture = schemasDir().parent_path() / "tests/fixtures/schema_valid.arxml";
@@ -111,7 +119,11 @@ TEST(CliJsonOutput, HumanOutputIsNotJson) {
 }
 
 // PAR-215.3: --json stdout stays clean (single JSON doc, no stray log lines).
+// Shell invocation via popen is POSIX-specific (see approval_test.cpp).
 TEST(CliJsonOutput, JsonStdoutContainsOnlyJson) {
+#ifdef _WIN32
+    GTEST_SKIP() << "popen shell harness is POSIX-specific";
+#endif
     const fs::path parseFixture = schemasDir().parent_path() / "tests/fixtures/schema_valid.arxml";
 #ifdef _WIN32
     const std::string nullRedirect = " 2>NUL";

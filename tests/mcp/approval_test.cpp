@@ -232,13 +232,20 @@ std::string versionSessionInput() {
 // approval_test.*.approved.txt. To regenerate after an intentional change:
 // run the test, review the .received.txt diff, then copy it over the
 // .approved.txt when the new output is correct.
+// Shell invocation via popen is POSIX-specific (see cli approval_test.cpp).
 
 TEST(McpApproval, BasicSession) {
+#ifdef _WIN32
+    GTEST_SKIP() << "popen shell harness is POSIX-specific";
+#endif
     std::string output = normalizeTranscript(runSession(basicSessionInput()));
     ApprovalTests::Approvals::verify(output);
 }
 
 TEST(McpApproval, ValidateSession) {
+#ifdef _WIN32
+    GTEST_SKIP() << "popen shell harness is POSIX-specific";
+#endif
     if (schemasMissing()) {
         GTEST_SKIP() << "user-supplied 4.2.2 schema not present";
     }
@@ -247,11 +254,17 @@ TEST(McpApproval, ValidateSession) {
 }
 
 TEST(McpApproval, DiffSession) {
+#ifdef _WIN32
+    GTEST_SKIP() << "popen shell harness is POSIX-specific";
+#endif
     std::string output = normalizeTranscript(runSession(diffSessionInput()));
     ApprovalTests::Approvals::verify(output);
 }
 
 TEST(McpApproval, WriteSession) {
+#ifdef _WIN32
+    GTEST_SKIP() << "popen shell harness is POSIX-specific";
+#endif
     std::filesystem::remove(goldenWritePath());
     std::string output = normalizeTranscript(runSession(writeSessionInput()));
     std::filesystem::remove(goldenWritePath());
@@ -259,11 +272,17 @@ TEST(McpApproval, WriteSession) {
 }
 
 TEST(McpApproval, ErrorSession) {
+#ifdef _WIN32
+    GTEST_SKIP() << "popen shell harness is POSIX-specific";
+#endif
     std::string output = normalizeTranscript(runSession(errorSessionInput()));
     ApprovalTests::Approvals::verify(output);
 }
 
 TEST(McpApproval, VersionSession) {
+#ifdef _WIN32
+    GTEST_SKIP() << "popen shell harness is POSIX-specific";
+#endif
     std::string output = normalizeTranscript(runSession(versionSessionInput()));
     ApprovalTests::Approvals::verify(output);
 }
