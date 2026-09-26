@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <parsex/schema/schema_registry.hpp>
+#include <parsex/schema/schema_resolution_error.hpp>
+
+#include <optional>
+
 #include "tools.hpp"
 
 namespace {
@@ -10,6 +15,22 @@ std::string fixture(const std::string& name) {
 #else
     return "tests/fixtures/" + name;
 #endif
+}
+
+// User-supplied AUTOSAR XSDs are gitignored (see resources/schemas/README.md):
+// skip validation-pass tests where they are absent (e.g. CI), following
+// schema_registry_integration_test.cpp's precedent. Any failure other than
+// UnsupportedRelease propagates.
+bool schemasMissing() {
+    try {
+        (void)resolveSchema("4.2.2");
+        return false;
+    } catch (const SchemaResolutionError& err) {
+        if (err.reason() != SchemaResolutionReason::UnsupportedRelease) {
+            throw;
+        }
+        return true;
+    }
 }
 
 }  // namespace
@@ -29,6 +50,9 @@ TEST(ReadTools, ParseMalformedThrowsForDispatch) {
 }
 
 TEST(ReadTools, ValidateValidPassesWithoutToolError) {
+    if (schemasMissing()) {
+        GTEST_SKIP() << "user-supplied 4.2.2 schema not present";
+    }
     nlohmann::json args = {{"path", fixture("schema_valid.arxml")}};
     nlohmann::json packed;
     ASSERT_NO_THROW(packed = validateTool(args));
@@ -51,6 +75,9 @@ TEST(ReadTools, ValidateUnparseableBecomesFindingNotThrow) {
 }
 
 TEST(ReadTools, ValidateStrictFlagRespected) {
+    if (schemasMissing()) {
+        GTEST_SKIP() << "user-supplied 4.2.2 schema not present";
+    }
     nlohmann::json lenient = {{"path", fixture("schema_valid.arxml")}};
     nlohmann::json strict = {{"path", fixture("schema_valid.arxml")}, {"strict", true}};
     nlohmann::json lenientResult = validateTool(lenient);

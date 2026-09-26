@@ -48,5 +48,5 @@ RawDocument loadRawDocument(const std::filesystem::path& path);
 // messages, telemetry labels) — no file is opened. Throws the same
 // ParseError[Syntax] / runtime_error set as loadRawDocument() for malformed
 // input, so fuzz harnesses can treat any exception as "handled gracefully".
-RawDocument loadRawDocumentFromMemory(std::span<const std::uint8_t> bytes,
+RawDocument loadRawDocumentFromMemory(std::span<const std::uint8_t> input,
                                       const std::filesystem::path& displayPath);

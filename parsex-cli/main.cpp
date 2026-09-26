@@ -34,9 +34,11 @@ namespace {
 inline std::pair<std::filesystem::path, std::string> resolveSchemaCacheDir(
     int argc, char const* const* argv, const std::string& boundValue) {
     bool flagPresent = false;
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if (arg == "--schema-cache-dir" || arg.rfind("--schema-cache-dir=", 0) == 0) {
+    for (int idx = 1; idx < argc; ++idx) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): argv indexing is
+        // mandated by the OS main() contract; bounds are enforced by argc.
+        std::string arg = argv[idx];
+        if (arg == "--schema-cache-dir" || arg.starts_with("--schema-cache-dir=")) {
             flagPresent = true;
             break;
         }
@@ -44,7 +46,8 @@ inline std::pair<std::filesystem::path, std::string> resolveSchemaCacheDir(
     if (flagPresent) {
         return {std::filesystem::path(boundValue), "flag"};
     }
-    if (const char* env = std::getenv("PARSEX_SCHEMA_CACHE_DIR"); env != nullptr && env[0] != '\0') {
+    if (const char* env = std::getenv("PARSEX_SCHEMA_CACHE_DIR");
+        env != nullptr && *env != '\0') {
         return {std::filesystem::path(env), "env"};
     }
     if (!boundValue.empty()) {
@@ -69,20 +72,20 @@ inline void applySchemaCacheDir(int argc, char const* const* argv, const std::st
 }
 
 // PAR-224: human-readable formatting for Parser output (real engine, not placeholder).
-inline std::string formatHumanParse(const ParsedFile& pf) {
+inline std::string formatHumanParse(const ParsedFile& parsed) {
     std::ostringstream oss;
-    oss << "Parsed " << pf.sourcePath.string() << "\n";
-    oss << "  release: " << (pf.autosarRelease.empty() ? "(unknown)" : pf.autosarRelease) << "\n";
-    oss << "  clusters: " << pf.clusters.size() << "\n";
-    oss << "  ecuInstances: " << pf.ecuInstances.size() << "\n";
-    oss << "  frames: " << pf.frames.size() << "\n";
-    oss << "  pdus: " << pf.pdus.size() << "\n";
-    oss << "  signals: " << pf.signals.size() << "\n";
-    oss << "  signalGroups: " << pf.signalGroups.size() << "\n";
-    if (!pf.warnings.empty()) {
-        oss << "  warnings: " << pf.warnings.size() << "\n";
-        for (const auto& w : pf.warnings) {
-            oss << "    - " << w.message << "\n";
+    oss << "Parsed " << parsed.sourcePath.string() << "\n";
+    oss << "  release: " << (parsed.autosarRelease.empty() ? "(unknown)" : parsed.autosarRelease) << "\n";
+    oss << "  clusters: " << parsed.clusters.size() << "\n";
+    oss << "  ecuInstances: " << parsed.ecuInstances.size() << "\n";
+    oss << "  frames: " << parsed.frames.size() << "\n";
+    oss << "  pdus: " << parsed.pdus.size() << "\n";
+    oss << "  signals: " << parsed.signals.size() << "\n";
+    oss << "  signalGroups: " << parsed.signalGroups.size() << "\n";
+    if (!parsed.warnings.empty()) {
+        oss << "  warnings: " << parsed.warnings.size() << "\n";
+        for (const auto& warning : parsed.warnings) {
+            oss << "    - " << warning.message << "\n";
         }
     }
     return oss.str();
@@ -95,10 +98,10 @@ inline std::string formatHumanValidate(const ValidationResult& result, bool stri
     bool passed = Validator::overallPassed(result, strict ? StrictMode::Strict : StrictMode::Lenient);
     std::ostringstream oss;
     oss << (passed ? "Validation passed" : "Validation failed") << " (" << result.errors.size() << " issues)\n";
-    for (const auto& e : result.errors) {
-        oss << "  [" << (e.severity == Severity::Warning ? "warning" : "error") << "] " << e.code << ": " << e.message << "\n";
-        if (e.path) {
-            oss << "    path: " << *e.path << "\n";
+    for (const auto& error : result.errors) {
+        oss << "  [" << (error.severity == Severity::Warning ? "warning" : "error") << "] " << error.code << ": " << error.message << "\n";
+        if (error.path) {
+            oss << "    path: " << *error.path << "\n";
         }
     }
     return oss.str();
@@ -127,19 +130,19 @@ inline std::string formatHumanWrite(const std::filesystem::path& input, const st
 }
 
 // PAR-224: JSON via shared envelope — parseReport payload with counts.
-inline nlohmann::json buildJsonParse(const ParsedFile& pf) {
+inline nlohmann::json buildJsonParse(const ParsedFile& parsed) {
     nlohmann::json payload;
-    payload["sourcePath"] = pf.sourcePath.string();
-    payload["autosarRelease"] = pf.autosarRelease;
-    payload["counts"] = {{"clusters", pf.clusters.size()},
-                         {"ecuInstances", pf.ecuInstances.size()},
-                         {"frames", pf.frames.size()},
-                         {"pdus", pf.pdus.size()},
-                         {"signals", pf.signals.size()},
-                         {"signalGroups", pf.signalGroups.size()}};
+    payload["sourcePath"] = parsed.sourcePath.string();
+    payload["autosarRelease"] = parsed.autosarRelease;
+    payload["counts"] = {{"clusters", parsed.clusters.size()},
+                         {"ecuInstances", parsed.ecuInstances.size()},
+                         {"frames", parsed.frames.size()},
+                         {"pdus", parsed.pdus.size()},
+                         {"signals", parsed.signals.size()},
+                         {"signalGroups", parsed.signalGroups.size()}};
     nlohmann::json warnings = nlohmann::json::array();
-    for (const auto& w : pf.warnings) {
-        warnings.push_back({{"message", w.message}});
+    for (const auto& warning : parsed.warnings) {
+        warnings.push_back({{"message", warning.message}});
     }
     payload["warnings"] = std::move(warnings);
     return parsex::json_contract::wrapEnvelope("parseReport", std::move(payload));
@@ -171,9 +174,189 @@ inline nlohmann::json buildJsonWrite(const std::filesystem::path& input, const s
     return parsex::json_contract::wrapEnvelope("writeResult", std::move(payload));
 }
 
+struct CliOptions {
+    bool jsonOutput{false};
+    bool noColor{false};
+    bool trace{false};
+};
+
+inline void emitTraceIfEnabled(const CliOptions& opts) {
+    if (opts.trace) {
+        std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
+    }
+}
+
+inline void runParseCommand(const CliOptions& opts, int argc, char const* const* argv,
+                            const std::string& schemaCacheDir, const std::string& parseInput) {
+    applySchemaCacheDir(argc, argv, schemaCacheDir);
+    parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
+    if (opts.trace) {
+        parsex::telemetry::TelemetryContext::reset();
+    }
+    ParsedFile parsedFile;
+    std::exception_ptr pendingException;
+    {
+        parsex::telemetry::ScopedSpan span("parsex-cli.parse");
+        try {
+            Parser parser;
+            parsedFile = parser.parseFile(std::filesystem::path(parseInput));
+        } catch (...) {
+            pendingException = std::current_exception();
+        }
+    }
+    if (pendingException) {
+        emitTraceIfEnabled(opts);
+        std::rethrow_exception(pendingException);
+    }
+    if (opts.jsonOutput) {
+        std::cout << buildJsonParse(parsedFile).dump(2) << "\n";
+    } else {
+        std::cout << formatHumanParse(parsedFile);
+    }
+    emitTraceIfEnabled(opts);
+}
+
+inline void runValidateCommand(const CliOptions& opts, int argc, char const* const* argv,
+                               const std::string& schemaCacheDir, const std::string& validateInput,
+                               bool validateStrict) {
+    applySchemaCacheDir(argc, argv, schemaCacheDir);
+    parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
+    if (opts.trace) {
+        parsex::telemetry::TelemetryContext::reset();
+    }
+    Parser parser;
+    ParsedProject project;
+    ValidationResult result;
+    const bool strict = validateStrict;
+    bool parsedOk = false;
+    {
+        parsex::telemetry::ScopedSpan span("parsex-cli.validate");
+        try {
+            auto parsed = parser.parseFile(std::filesystem::path(validateInput));
+            project.files.push_back(std::move(parsed));
+            parsedOk = true;
+        } catch (const std::exception& ex) {
+            result.errors.push_back({Severity::Error, "parse.failed", ex.what()});
+            parsedOk = false;
+        }
+        if (parsedOk) {
+            try {
+                const std::string& release = project.files.front().autosarRelease;
+                if (!release.empty()) {
+                    auto resolved = resolveSchema(release);
+                    Validator validator;
+                    auto combined = validator.validateAll(project, resolved.schema.schemaHandle.get());
+                    result.merge(combined);
+                } else {
+                    result.errors.push_back(
+                        {Severity::Error, "schema.no_release", "cannot determine AUTOSAR release for validation"});
+                }
+            } catch (const std::exception& ex) {
+                result.errors.push_back({Severity::Error, "validator.error", ex.what()});
+            }
+        }
+    }
+    if (opts.jsonOutput) {
+        std::cout << buildJsonValidate(result, strict).dump(2) << "\n";
+    } else {
+        std::cout << formatHumanValidate(result, strict);
+    }
+    emitTraceIfEnabled(opts);
+    // Validations findings do not change the process exit code — always 0
+    // when the tool ran; pass/fail lives in payload.passed. Only malformed
+    // invocation or I/O (handled by top-level catch) causes non-zero.
+}
+
+inline void runDiffCommand(const CliOptions& opts, int argc, char const* const* argv,
+                           const std::string& schemaCacheDir, const std::string& diffBase,
+                           const std::string& diffTarget) {
+    applySchemaCacheDir(argc, argv, schemaCacheDir);
+    parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
+    if (opts.trace) {
+        parsex::telemetry::TelemetryContext::reset();
+    }
+    DiffReport report;
+    std::exception_ptr pendingException;
+    {
+        parsex::telemetry::ScopedSpan span("parsex-cli.diff");
+        try {
+            Parser parser;
+            ParsedProject oldProject;
+            ParsedProject newProject;
+            oldProject.files.push_back(parser.parseFile(std::filesystem::path(diffBase)));
+            newProject.files.push_back(parser.parseFile(std::filesystem::path(diffTarget)));
+            DiffEngine engine;
+            report = engine.diff(oldProject, newProject);
+        } catch (...) {
+            pendingException = std::current_exception();
+        }
+    }
+    if (pendingException) {
+        emitTraceIfEnabled(opts);
+        std::rethrow_exception(pendingException);
+    }
+    if (opts.jsonOutput) {
+        std::cout << buildJsonDiff(report).dump(2) << "\n";
+    } else {
+        std::cout << formatHumanDiff(report);
+    }
+    emitTraceIfEnabled(opts);
+}
+
+inline void runWriteCommand(const CliOptions& opts, int argc, char const* const* argv,
+                            const std::string& schemaCacheDir, const std::string& writeInput,
+                            const std::string& writeOutput, bool writeApply) {
+    applySchemaCacheDir(argc, argv, schemaCacheDir);
+    parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
+    if (opts.trace) {
+        parsex::telemetry::TelemetryContext::reset();
+    }
+    bool wrote = false;
+    bool success = true;
+    const std::filesystem::path outPath(writeOutput);
+    const std::filesystem::path inPath(writeInput);
+    std::exception_ptr pendingException;
+    {
+        parsex::telemetry::ScopedSpan span("parsex-cli.write");
+        try {
+            Parser parser;
+            ParsedProject project;
+            project.files.push_back(parser.parseFile(inPath));
+            const bool applied = writeApply;
+            wrote = applied;
+            if (applied) {
+                WriteEngine engine;
+                engine.write(project, outPath);
+            } else {
+                WriteEngine engine;
+                const ValidationResult problems = engine.validate(project);
+                success = !problems.hasErrors();
+            }
+        } catch (...) {
+            pendingException = std::current_exception();
+        }
+    }
+    if (pendingException) {
+        emitTraceIfEnabled(opts);
+        std::rethrow_exception(pendingException);
+    }
+    if (opts.jsonOutput) {
+        std::cout << buildJsonWrite(inPath, outPath, wrote, success).dump(2) << "\n";
+    } else {
+        std::cout << formatHumanWrite(inPath, outPath, wrote);
+        if (!wrote && !success) {
+            std::cout << "  (would fail: project has write validation errors)\n";
+        }
+    }
+    emitTraceIfEnabled(opts);
+}
+
 }  // namespace
 
-int main(int argc, char const *argv[])
+// NOLINTNEXTLINE(readability-function-cognitive-complexity): main wires four subcommands;
+// per-command work lives in run*Command() helpers above, so the complexity is declarative
+// CLI11 setup, not branching logic.
+int main(int argc, char const* const* argv)
 {
     CLI::App app{"parsex - ARXML CAN parsing, validation, diffing and safe editing", "parsex"};
 
@@ -184,11 +367,6 @@ int main(int argc, char const *argv[])
 
     // Shared top-level options readable from every subcommand callback.
     // PAR-206 branches on jsonOutput without re-parsing.
-    struct CliOptions {
-        bool jsonOutput{false};
-        bool noColor{false};
-        bool trace{false};
-    };
     CliOptions opts;
     app.add_flag("--json", opts.jsonOutput, "Emit machine-readable JSON instead of human-readable text");
     app.add_flag("--no-color", opts.noColor, "Disable colored output");
@@ -237,171 +415,16 @@ int main(int argc, char const *argv[])
     diffCmd->add_option("--base", diffBase, "Base ARXML file")->required()->check(CLI::ExistingFile);
     diffCmd->add_option("--target", diffTarget, "Target ARXML file")->required()->check(CLI::ExistingFile);
     parseCmd->callback([&]() {
-        applySchemaCacheDir(argc, argv, schemaCacheDir);
-        parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
-        if (opts.trace) {
-            parsex::telemetry::TelemetryContext::reset();
-        }
-        ParsedFile pf;
-        std::exception_ptr ep;
-        {
-            parsex::telemetry::ScopedSpan span("parsex-cli.parse");
-            try {
-                Parser parser;
-                pf = parser.parseFile(std::filesystem::path(parseInput));
-            } catch (...) {
-                ep = std::current_exception();
-            }
-        }
-        if (ep) {
-            if (opts.trace) {
-                std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
-            }
-            std::rethrow_exception(ep);
-        }
-        if (opts.jsonOutput) {
-            std::cout << buildJsonParse(pf).dump(2) << "\n";
-        } else {
-            std::cout << formatHumanParse(pf);
-        }
-        if (opts.trace) {
-            std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
-        }
+        runParseCommand(opts, argc, argv, schemaCacheDir, parseInput);
     });
     validateCmd->callback([&]() {
-        applySchemaCacheDir(argc, argv, schemaCacheDir);
-        parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
-        if (opts.trace) {
-            parsex::telemetry::TelemetryContext::reset();
-        }
-        Parser parser;
-        ParsedProject project;
-        ValidationResult result;
-        bool strict = validateStrict;
-        bool parsedOk = false;
-        {
-            parsex::telemetry::ScopedSpan span("parsex-cli.validate");
-            try {
-                auto pf = parser.parseFile(std::filesystem::path(validateInput));
-                project.files.push_back(std::move(pf));
-                parsedOk = true;
-            } catch (const std::exception& ex) {
-                result.errors.push_back({Severity::Error, "parse.failed", ex.what()});
-                parsedOk = false;
-            }
-            if (parsedOk) {
-                try {
-                    const std::string& release = project.files.front().autosarRelease;
-                    if (!release.empty()) {
-                        auto resolved = resolveSchema(release);
-                        Validator validator;
-                        auto combined = validator.validateAll(project, resolved.schema.schemaHandle.get());
-                        result.merge(combined);
-                    } else {
-                        result.errors.push_back({Severity::Error, "schema.no_release", "cannot determine AUTOSAR release for validation"});
-                    }
-                } catch (const std::exception& ex) {
-                    result.errors.push_back({Severity::Error, "validator.error", ex.what()});
-                }
-            }
-        }
-        if (opts.jsonOutput) {
-            std::cout << buildJsonValidate(result, strict).dump(2) << "\n";
-        } else {
-            std::cout << formatHumanValidate(result, strict);
-        }
-        if (opts.trace) {
-            std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
-        }
-        // Validations findings do not change the process exit code — always 0
-        // when the tool ran; pass/fail lives in payload.passed. Only malformed
-        // invocation or I/O (handled by top-level catch) causes non-zero.
+        runValidateCommand(opts, argc, argv, schemaCacheDir, validateInput, validateStrict);
     });
     diffCmd->callback([&]() {
-        applySchemaCacheDir(argc, argv, schemaCacheDir);
-        parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
-        if (opts.trace) {
-            parsex::telemetry::TelemetryContext::reset();
-        }
-        DiffReport report;
-        std::exception_ptr ep;
-        {
-            parsex::telemetry::ScopedSpan span("parsex-cli.diff");
-            try {
-                Parser parser;
-                ParsedProject oldProject;
-                ParsedProject newProject;
-                oldProject.files.push_back(parser.parseFile(std::filesystem::path(diffBase)));
-                newProject.files.push_back(parser.parseFile(std::filesystem::path(diffTarget)));
-                DiffEngine engine;
-                report = engine.diff(oldProject, newProject);
-            } catch (...) {
-                ep = std::current_exception();
-            }
-        }
-        if (ep) {
-            if (opts.trace) {
-                std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
-            }
-            std::rethrow_exception(ep);
-        }
-        if (opts.jsonOutput) {
-            std::cout << buildJsonDiff(report).dump(2) << "\n";
-        } else {
-            std::cout << formatHumanDiff(report);
-        }
-        if (opts.trace) {
-            std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
-        }
+        runDiffCommand(opts, argc, argv, schemaCacheDir, diffBase, diffTarget);
     });
     writeCmd->callback([&]() {
-        applySchemaCacheDir(argc, argv, schemaCacheDir);
-        parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
-        if (opts.trace) {
-            parsex::telemetry::TelemetryContext::reset();
-        }
-        bool wrote = false;
-        bool success = true;
-        std::filesystem::path outPath(writeOutput);
-        std::filesystem::path inPath(writeInput);
-        std::exception_ptr ep;
-        {
-            parsex::telemetry::ScopedSpan span("parsex-cli.write");
-            try {
-                Parser parser;
-                ParsedProject project;
-                project.files.push_back(parser.parseFile(inPath));
-                bool applied = writeApply;
-                wrote = applied;
-                if (applied) {
-                    WriteEngine engine;
-                    engine.write(project, outPath);
-                } else {
-                    WriteEngine engine;
-                    ValidationResult problems = engine.validate(project);
-                    success = !problems.hasErrors();
-                }
-            } catch (...) {
-                ep = std::current_exception();
-            }
-        }
-        if (ep) {
-            if (opts.trace) {
-                std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
-            }
-            std::rethrow_exception(ep);
-        }
-        if (opts.jsonOutput) {
-            std::cout << buildJsonWrite(inPath, outPath, wrote, success).dump(2) << "\n";
-        } else {
-            std::cout << formatHumanWrite(inPath, outPath, wrote);
-            if (!wrote && !success) {
-                std::cout << "  (would fail: project has write validation errors)\n";
-            }
-        }
-        if (opts.trace) {
-            std::cerr << parsex::telemetry::TelemetryContext::currentTraceAsJson().dump(2) << "\n";
-        }
+        runWriteCommand(opts, argc, argv, schemaCacheDir, writeInput, writeOutput, writeApply);
     });
     (void)parseCmd;
     (void)validateCmd;
@@ -437,9 +460,9 @@ int main(int argc, char const *argv[])
         // Keep the message on one line; collapse any embedded newlines so the
         // boundary never emits multi-line diagnostics.
         std::string msg = ex.what();
-        for (char& ch : msg) {
-            if (ch == '\n' || ch == '\r') {
-                ch = ' ';
+        for (char& currentChar : msg) {
+            if (currentChar == '\n' || currentChar == '\r') {
+                currentChar = ' ';
             }
         }
         // Prefix with program name per clig.dev error guidance; avoid raw

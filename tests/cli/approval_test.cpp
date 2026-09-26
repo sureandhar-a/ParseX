@@ -9,10 +9,26 @@
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
+#include <parsex/schema/schema_registry.hpp>
+#include <parsex/schema/schema_resolution_error.hpp>
 
 namespace fs = std::filesystem;
 
 namespace {
+
+bool schemasMissing() {
+    try {
+        (void)resolveSchema("4.2.2");
+        return false;
+    } catch (const SchemaResolutionError& err) {
+        if (err.reason() != SchemaResolutionReason::UnsupportedRelease) {
+            throw;
+        }
+        return true;
+    } catch (...) {
+        return true;
+    }
+}
 
 fs::path cliBinary() {
 #ifdef PARSEX_CLI_BINARY
@@ -130,6 +146,9 @@ TEST(ApprovalTests, ParseHuman) {
 }
 
 TEST(ApprovalTests, ValidateHuman) {
+    if (schemasMissing()) {
+        GTEST_SKIP() << "user-supplied 4.2.2 schema not present";
+    }
     auto output = normalizeForApproval(runValidateHuman());
     ApprovalTests::Approvals::verify(output);
 }
@@ -155,6 +174,9 @@ TEST(ApprovalTests, ParseJson) {
 }
 
 TEST(ApprovalTests, ValidateJson) {
+    if (schemasMissing()) {
+        GTEST_SKIP() << "user-supplied 4.2.2 schema not present";
+    }
     auto output = normalizeJsonForApproval(runValidateJson());
     ApprovalTests::Approvals::verify(output);
 }

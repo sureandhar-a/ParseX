@@ -189,7 +189,7 @@ inline bool isValidEnvelope(const nlohmann::json& message) {
         // No id: only acceptable for notifications.
         if (message.contains("method") && message["method"].is_string()) {
             const std::string method = message["method"].get<std::string>();
-            if (method.rfind("notifications/", 0) == 0) {
+            if (method.starts_with("notifications/")) {
                 return true;
             }
         }

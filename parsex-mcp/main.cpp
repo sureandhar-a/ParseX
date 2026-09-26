@@ -200,58 +200,66 @@ bool rejectOverDeepLine(const std::string& line) {
 }  // namespace
 
 int main() {
-    ToolRegistry registry = ToolRegistry::withSchemas();
-    registry.setHandler("parse_arxml", parseTool);
-    registry.setHandler("validate_arxml", validateTool);
-    registry.setHandler("diff_arxml", diffTool);
-    registry.setHandler("write_arxml", writeTool);
-    std::string line;
-    while (std::getline(std::cin, line)) {
-        // Empty lines carry no message; skip without responding.
-        if (line.empty()) {
-            continue;
-        }
-        if (rejectOverDeepLine(line)) {
-            continue;
-        }
-        nlohmann::json message;
-        try {
-            message = nlohmann::json::parse(line);
-        } catch (const std::exception& ex) {
-            // No valid JSON means no reliable id. Try to recover one for a
-            // proper Parse Error; otherwise log to stderr and keep looping.
-            try {
-                const auto recovered = tryRecoverId(line);
-                if (recovered.has_value()) {
-                    try {
-                        writeMessage(makeParseError(*recovered));
-                    } catch (const std::exception& sendEx) {
-                        std::cerr << "failed to send parse error: " << sendEx.what() << "\n";
-                    }
-                } else {
-                    std::cerr << "skipping malformed line: " << ex.what() << "\n";
-                }
-            } catch (const std::exception& recoverEx) {
-                std::cerr << "skipping malformed line (" << recoverEx.what() << ")\n";
+    try {
+        ToolRegistry registry = ToolRegistry::withSchemas();
+        registry.setHandler("parse_arxml", parseTool);
+        registry.setHandler("validate_arxml", validateTool);
+        registry.setHandler("diff_arxml", diffTool);
+        registry.setHandler("write_arxml", writeTool);
+        std::string line;
+        while (std::getline(std::cin, line)) {
+            // Empty lines carry no message; skip without responding.
+            if (line.empty()) {
+                continue;
             }
-            continue;
-        }
-        try {
-            if (!isValidEnvelope(message)) {
+            if (rejectOverDeepLine(line)) {
+                continue;
+            }
+            nlohmann::json message;
+            try {
+                message = nlohmann::json::parse(line);
+            } catch (const std::exception& ex) {
+                // No valid JSON means no reliable id. Try to recover one for a
+                // proper Parse Error; otherwise log to stderr and keep looping.
                 try {
-                    writeMessage(makeInvalidRequest(idOrNull(message)));
-                } catch (const std::exception& sendEx) {
-                    std::cerr << "failed to send request error: " << sendEx.what() << "\n";
+                    const auto recovered = tryRecoverId(line);
+                    if (recovered.has_value()) {
+                        try {
+                            writeMessage(makeParseError(*recovered));
+                        } catch (const std::exception& sendEx) {
+                            std::cerr << "failed to send parse error: " << sendEx.what() << "\n";
+                        }
+                    } else {
+                        std::cerr << "skipping malformed line: " << ex.what() << "\n";
+                    }
+                } catch (const std::exception& recoverEx) {
+                    std::cerr << "skipping malformed line (" << recoverEx.what() << ")\n";
                 }
                 continue;
             }
-            dispatchMessage(message, registry);
-        } catch (const std::exception& ex) {
-            // Validation and dispatch must never escape; the loop survives
-            // any sequence of malformed lines.
-            std::cerr << "skipping invalid message: " << ex.what() << "\n";
+            try {
+                if (!isValidEnvelope(message)) {
+                    try {
+                        writeMessage(makeInvalidRequest(idOrNull(message)));
+                    } catch (const std::exception& sendEx) {
+                        std::cerr << "failed to send request error: " << sendEx.what() << "\n";
+                    }
+                    continue;
+                }
+                dispatchMessage(message, registry);
+            } catch (const std::exception& ex) {
+                // Validation and dispatch must never escape; the loop survives
+                // any sequence of malformed lines.
+                std::cerr << "skipping invalid message: " << ex.what() << "\n";
+            }
         }
+        // EOF is the normal shutdown path for a stdio server.
+        return 0;
+    } catch (const std::exception& ex) {
+        std::cerr << "parsex-mcp: " << ex.what() << "\n";
+        return 1;
+    } catch (...) {
+        std::cerr << "parsex-mcp: unknown startup failure\n";
+        return 1;
     }
-    // EOF is the normal shutdown path for a stdio server.
-    return 0;
 }
