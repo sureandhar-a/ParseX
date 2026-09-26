@@ -46,12 +46,16 @@ fs::path fixturesDir() {
 #endif
 }
 
-// Capture stdout of command (stderr redirected to /dev/null to hide [debug] line).
+// Capture stdout of command (stderr discarded to hide [debug] line).
 std::string captureStdout(const std::string& cmd) {
     std::array<char, 4096> buf{};
     std::string out;
-    // Redirect stderr to /dev/null so only human stdout is approved.
-    std::string fullCmd = cmd + " 2>/dev/null";
+    // Redirect stderr to the null device so only stdout is approved.
+#ifdef _WIN32
+    const std::string fullCmd = cmd + " 2>NUL";
+#else
+    const std::string fullCmd = cmd + " 2>/dev/null";
+#endif
     FILE* pipe = ::popen(fullCmd.c_str(), "r");
     if (!pipe) {
         throw std::runtime_error("popen failed: " + fullCmd);
@@ -70,7 +74,7 @@ std::string captureStdout(const std::string& cmd) {
 
 std::string normalizeForApproval(std::string s) {
     // Make output machine-independent: replace absolute fixture dir with empty.
-    std::string dir = fixturesDir().string();
+    const std::string dir = fixturesDir().string();
     std::string::size_type pos = 0;
     while ((pos = s.find(dir, pos)) != std::string::npos) {
         s.replace(pos, dir.size(), "");
@@ -80,8 +84,31 @@ std::string normalizeForApproval(std::string s) {
         }
         pos += 1;
     }
-    // Also normalize any absolute /tmp path prefix that appears in write output
-    // (e.g. "/tmp/parsex_approval_write.arxml" is already stable, keep as is)
+    // Normalize the temp write path to the stable /tmp placeholder used in
+    // approved baselines (temp_directory_path() varies per machine/OS).
+    const std::string writeName = "parsex_approval_write.arxml";
+    const std::string writePlaceholder = "/tmp/parsex_approval_write.arxml";
+    pos = 0;
+    while ((pos = s.find(writeName, pos)) != std::string::npos) {
+        // Skip occurrences already inside the placeholder (avoid self-match loop).
+        if (pos >= 5 && s.compare(pos - 5, 5, "/tmp/") == 0) {
+            pos += writeName.size();
+            continue;
+        }
+        // Walk back to the start of the path (space, quote, or start).
+        std::string::size_type start = s.rfind(' ', pos);
+        const std::string::size_type quote = s.rfind('"', pos);
+        if (quote != std::string::npos && (start == std::string::npos || quote > start)) {
+            start = quote;
+        }
+        if (start == std::string::npos) {
+            start = 0;
+        } else {
+            start += 1;
+        }
+        s.replace(start, pos + writeName.size() - start, writePlaceholder);
+        pos = start + writePlaceholder.size();
+    }
     return s;
 }
 
@@ -97,8 +124,14 @@ std::string runDiffHuman() {
     return captureStdout("\"" + cliBinary().string() + "\" diff --base \"" + (fixturesDir() / "schema_valid.arxml").string() + "\" --target \"" + (fixturesDir() / "schema_valid.arxml").string() + "\"");
 }
 
+std::string approvalWritePath() {
+    return (fs::temp_directory_path() / "parsex_approval_write.arxml").string();
+}
+
 std::string runWriteHuman() {
-    return captureStdout("\"" + cliBinary().string() + "\" write --input \"" + (fixturesDir() / "schema_valid.arxml").string() + "\" --output /tmp/parsex_approval_write.arxml");
+    return captureStdout("\"" + cliBinary().string() + "\" write --input \"" +
+                         (fixturesDir() / "schema_valid.arxml").string() + "\" --output \"" +
+                         approvalWritePath() + "\"");
 }
 
 std::string runParseJson() {
@@ -114,7 +147,9 @@ std::string runDiffJson() {
 }
 
 std::string runWriteJson() {
-    return captureStdout("\"" + cliBinary().string() + "\" --json write --input \"" + (fixturesDir() / "schema_valid.arxml").string() + "\" --output /tmp/parsex_approval_write.arxml");
+    return captureStdout("\"" + cliBinary().string() + "\" --json write --input \"" +
+                         (fixturesDir() / "schema_valid.arxml").string() + "\" --output \"" +
+                         approvalWritePath() + "\"");
 }
 
 std::string normalizeJsonForApproval(std::string s) {

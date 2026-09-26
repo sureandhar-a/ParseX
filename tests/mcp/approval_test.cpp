@@ -58,7 +58,11 @@ std::string runSession(const std::string& inputLines) {
         fwrite(inputLines.data(), 1, inputLines.size(), out);
         fclose(out);
     }
-    std::string cmd = "\"" + mcpBinary().string() + "\" < \"" + tmp.string() + "\" 2>/dev/null";
+#ifdef _WIN32
+    const std::string cmd = "\"" + mcpBinary().string() + "\" < \"" + tmp.string() + "\" 2>NUL";
+#else
+    const std::string cmd = "\"" + mcpBinary().string() + "\" < \"" + tmp.string() + "\" 2>/dev/null";
+#endif
     std::array<char, 4096> buf{};
     std::string captured;
     FILE* pipe = ::popen(cmd.c_str(), "r");
@@ -72,14 +76,47 @@ std::string runSession(const std::string& inputLines) {
     return captured;
 }
 
+std::string goldenWritePath() {
+    return (fs::temp_directory_path() / "bridge-golden-write.arxml").string();
+}
+
 std::string normalizeTranscript(std::string s) {
-    std::string dir = fixturesDir().string();
+    const std::string dir = fixturesDir().string();
     std::string::size_type pos = 0;
     while ((pos = s.find(dir, pos)) != std::string::npos) {
         s.replace(pos, dir.size(), "<fixtures>");
         pos += 12;
     }
     // Normalize temp output paths so golden files stay machine-independent.
+    // Replace the exact temp write path (raw and JSON-escaped forms) with a
+    // stable placeholder, preserving surrounding text.
+    const std::string tempPath = goldenWritePath();
+    const std::string placeholder = "<tmp>/golden.arxml";
+    pos = 0;
+    while ((pos = s.find(tempPath, pos)) != std::string::npos) {
+        s.replace(pos, tempPath.size(), placeholder);
+        pos += placeholder.size();
+    }
+    // JSON-escaped form on Windows (backslashes doubled): C:\\...\\file.
+    std::string escapedTemp = tempPath;
+    {
+        std::string doubled;
+        for (char ch : escapedTemp) {
+            if (ch == '\\') {
+                doubled += "\\\\";
+            }
+            doubled += ch;
+        }
+        escapedTemp = std::move(doubled);
+    }
+    if (escapedTemp != tempPath) {
+        pos = 0;
+        while ((pos = s.find(escapedTemp, pos)) != std::string::npos) {
+            s.replace(pos, escapedTemp.size(), placeholder);
+            pos += placeholder.size();
+        }
+    }
+    // Legacy prefix form (Unix-only runs) for already-approved baselines.
     const std::string tmpPrefix = "/tmp/bridge-golden";
     pos = 0;
     while ((pos = s.find(tmpPrefix, pos)) != std::string::npos) {
@@ -154,20 +191,21 @@ std::string diffSessionInput() {
     const std::string other = jsonEscape((fixturesDir() / "system-4.2.arxml").string());
     return "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"diff_arxml\","
            "\"arguments\":{\"basePath\":\"" +
-           same + "\",\"targetPath\":\"" + same + "\"}}}\n"
-           "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"diff_arxml\","
-           "\"arguments\":{\"basePath\":\"" +
-           same + "\",\"targetPath\":\"" + other + "\"}}}\n";
+            same + "\",\"targetPath\":\"" + same + "\"}}}\n"
+            "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"diff_arxml\","
+            "\"arguments\":{\"basePath\":\"" +
+            same + "\",\"targetPath\":\"" + other + "\"}}}\n";
 }
 
 std::string writeSessionInput() {
     const std::string file = jsonEscape((fixturesDir() / "schema_valid.arxml").string());
+    const std::string outFile = jsonEscape(goldenWritePath());
     return "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"write_arxml\","
            "\"arguments\":{\"path\":\"" +
-           file + "\",\"outputPath\":\"/tmp/bridge-golden-write.arxml\"}}}\n"
+           file + "\",\"outputPath\":\"" + outFile + "\"}}}\n"
            "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"write_arxml\","
            "\"arguments\":{\"path\":\"" +
-           file + "\",\"outputPath\":\"/tmp/bridge-golden-write.arxml\",\"apply\":true}}}\n";
+           file + "\",\"outputPath\":\"" + outFile + "\",\"apply\":true}}}\n";
 }
 
 std::string errorSessionInput() {
@@ -214,9 +252,9 @@ TEST(McpApproval, DiffSession) {
 }
 
 TEST(McpApproval, WriteSession) {
-    std::filesystem::remove("/tmp/bridge-golden-write.arxml");
+    std::filesystem::remove(goldenWritePath());
     std::string output = normalizeTranscript(runSession(writeSessionInput()));
-    std::filesystem::remove("/tmp/bridge-golden-write.arxml");
+    std::filesystem::remove(goldenWritePath());
     ApprovalTests::Approvals::verify(output);
 }
 

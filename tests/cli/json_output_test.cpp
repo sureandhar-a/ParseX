@@ -66,8 +66,14 @@ std::string trimLeft(const std::string& s) {
 // PAR-215.1: --json output validates against the Output Contract schema.
 // Reuses PAR-165's validatesAgainstSchema() approach (not a regex).
 TEST(CliJsonOutput, JsonValidateConformsToEnvelopeSchema) {
+#ifdef _WIN32
+    const std::string nullRedirect = " 2>NUL";
+#else
+    const std::string nullRedirect = " 2>/dev/null";
+#endif
     const std::string cmd =
-        "\"" + cliBinary().string() + "\" --json validate --input \"" + fixtureFile().string() + "\" 2>/dev/null";
+        "\"" + cliBinary().string() + "\" --json validate --input \"" + fixtureFile().string() +
+        "\"" + nullRedirect;
     const auto [rc, out] = runCapture(cmd);
     EXPECT_EQ(rc, 0) << "cmd: " << cmd << "\noutput: " << out;
 
@@ -89,8 +95,14 @@ TEST(CliJsonOutput, HumanOutputIsNotJson) {
     // PAR-224: parse now calls real Parser; tiny_valid.arxml is unsupported
     // (4.0.0). Use a fixture that the Parser can actually handle.
     const fs::path parseFixture = schemasDir().parent_path() / "tests/fixtures/schema_valid.arxml";
+#ifdef _WIN32
+    const std::string nullRedirect = " 2>NUL";
+#else
+    const std::string nullRedirect = " 2>/dev/null";
+#endif
     const std::string cmd =
-        "\"" + cliBinary().string() + "\" parse --input \"" + parseFixture.string() + "\" 2>/dev/null";
+        "\"" + cliBinary().string() + "\" parse --input \"" + parseFixture.string() + "\"" +
+        nullRedirect;
     const auto [rc, out] = runCapture(cmd);
     EXPECT_EQ(rc, 0) << "cmd: " << cmd << "\noutput: " << out;
     const std::string trimmed = trimLeft(out);
@@ -101,8 +113,14 @@ TEST(CliJsonOutput, HumanOutputIsNotJson) {
 // PAR-215.3: --json stdout stays clean (single JSON doc, no stray log lines).
 TEST(CliJsonOutput, JsonStdoutContainsOnlyJson) {
     const fs::path parseFixture = schemasDir().parent_path() / "tests/fixtures/schema_valid.arxml";
+#ifdef _WIN32
+    const std::string nullRedirect = " 2>NUL";
+#else
+    const std::string nullRedirect = " 2>/dev/null";
+#endif
     const std::string cmd =
-        "\"" + cliBinary().string() + "\" --json parse --input \"" + parseFixture.string() + "\" 2>/dev/null";
+        "\"" + cliBinary().string() + "\" --json parse --input \"" + parseFixture.string() + "\"" +
+        nullRedirect;
     const auto [rc, out] = runCapture(cmd);
     EXPECT_EQ(rc, 0) << "cmd: " << cmd << "\noutput: " << out;
     nlohmann::json doc;
