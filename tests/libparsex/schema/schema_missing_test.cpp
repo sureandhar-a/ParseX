@@ -14,8 +14,21 @@
 
 namespace {
 
-void setEnv(const char* name, const std::string& value) { setenv(name, value.c_str(), 1); }
-void unsetEnv(const char* name) { unsetenv(name); }
+void setEnv(const char* name, const std::string& value) {
+#ifdef _WIN32
+    _putenv_s(name, value.c_str());
+#else
+    setenv(name, value.c_str(), 1);
+#endif
+}
+
+void unsetEnv(const char* name) {
+#ifdef _WIN32
+    _putenv_s(name, "");
+#else
+    unsetenv(name);
+#endif
+}
 
 struct Guard {
     std::optional<std::string> xdg;

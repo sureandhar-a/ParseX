@@ -177,9 +177,29 @@ void dispatchMessage(const nlohmann::json& message, const ToolRegistry& registry
     }
 }
 
+// Depth guard, run before parsing: an over-deep line is rejected without ever
+// being materialised, because copying or dumping it would recurse once per
+// level and overflow the stack. Returns true when the line was handled.
+bool rejectOverDeepLine(const std::string& line) {
+    if (!exceedsMaxDepth(line)) {
+        return false;
+    }
+    const auto recovered = tryRecoverId(line);
+    if (!recovered.has_value()) {
+        std::cerr << "skipping over-deep line (max depth " << kMaxJsonDepth << ", no recoverable id)\n";
+        return true;
+    }
+    try {
+        writeMessage(makeNestingTooDeep(*recovered));
+    } catch (const std::exception& sendEx) {
+        std::cerr << "failed to send nesting error: " << sendEx.what() << "\n";
+    }
+    return true;
+}
+
 }  // namespace
 
-int main() {
+int runServer() {
     ToolRegistry registry = ToolRegistry::withSchemas();
     registry.setHandler("parse_arxml", parseTool);
     registry.setHandler("validate_arxml", validateTool);
@@ -189,6 +209,9 @@ int main() {
     while (std::getline(std::cin, line)) {
         // Empty lines carry no message; skip without responding.
         if (line.empty()) {
+            continue;
+        }
+        if (rejectOverDeepLine(line)) {
             continue;
         }
         nlohmann::json message;
@@ -231,4 +254,16 @@ int main() {
     }
     // EOF is the normal shutdown path for a stdio server.
     return 0;
+}
+
+int main() {
+    try {
+        return runServer();
+    } catch (const std::exception& ex) {
+        std::cerr << "parsex-mcp: " << ex.what() << "\n";
+        return 1;
+    } catch (...) {
+        std::cerr << "parsex-mcp: unknown startup failure\n";
+        return 1;
+    }
 }

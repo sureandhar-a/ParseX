@@ -128,11 +128,12 @@ Description surfaced to models states the preview default and confirmation step 
 * Version handling is scoped down: speaks stateless `2026-07-28` with per-request `_meta`, detects but does not support older `initialize`-handshake clients — they get a clear version error rather than silent misbehavior.
 * Tools primitive only. `resources` and `prompts` are out of scope — engines map naturally onto callable actions, not browsable data.
 * No `listChanged` notifications — the tool set is fixed at startup.
+* Input nesting is capped at 128 levels. A deeper line is rejected before parsing with `-32600` (`error.data.maxDepth`); the server keeps running. Real MCP traffic is only a few levels deep.
 * Cancellation (`notifications/cancelled`) is best-effort: single-threaded, no concurrent calls, so a notice for a completed or unknown request is safely ignored. True mid-call interruption would need cooperatively cancellable engines.
 
 ## Testing
 
-* Pipe tests (`ctest -R "transport.pipe|protocol.pipe"`) drive the built binary over real stdin/stdout.
+* Pipe tests (`ctest -R "transport.pipe|protocol.pipe"`) drive the built binary over real stdin/stdout, including hostile input (`transport.pipe_survives_hostile_input`: 100k-deep nesting and a huge unterminated id).
 * Golden transcripts (`ctest -R McpApproval`) record full sessions (`server/discover -> tools/list -> tools/call` plus per-tool, error, and version sessions). To regenerate after an intentional change: run, review `.received.txt`, copy over `.approved.txt` when correct.
 * Sanitizers: `cmake --preset build-asan && ASAN_OPTIONS=detect_leaks=0 ctest --test-dir build/asan -R "transport.pipe|protocol.pipe|McpApproval|ReadTools|WriteTool|Dispatch"` — zero findings, including untrusted byte input.
 

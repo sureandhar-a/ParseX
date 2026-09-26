@@ -47,8 +47,18 @@ jobs:
           cmake --build build/coverage --parallel
           cmake --build build/coverage --target coverage
           python3 scripts/check_coverage_floor.py
+      # Verification above runs on the Debug build; what ships is a separate
+      # optimised Release build (no tests needed, they already passed).
+      - name: Configure release build (Unix)
+        if: runner.os != 'Windows'
+        run: cmake --preset release -DPARSEX_BUILD_TESTS=OFF
+      - name: Configure release build (Windows)
+        if: runner.os == 'Windows'
+        run: cmake --preset release -DPARSEX_BUILD_TESTS=OFF -DVCPKG_TARGET_TRIPLET=x64-mingw-static
+      - name: Build release binaries
+        run: cmake --build build/release --parallel
       - name: Package binaries
-        run: cmake --install build/debug --prefix release-stage
+        run: cmake --install build/release --prefix release-stage
       - name: Tarball
         run: tar czf parsex-${{ github.ref_name }}-${{ runner.os }}.tar.gz -C release-stage .
       - uses: actions/upload-artifact@v5

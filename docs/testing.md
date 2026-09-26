@@ -86,9 +86,14 @@ Pipeline stage: dedicated step after unit tests, before sanitizers.
 
 ## Slow resource checks (nightly only)
 
-Oversized input and deeply nested transport input must fail gracefully within
-bounds — never hang or overflow. Labeled `hardening_slow`, excluded from
-default PR runs.
+Oversized input must fail gracefully within bounds — never hang or crash.
+Labeled `hardening_slow`, excluded from default PR runs.
+
+Deeply nested transport input is not a slow check: `parsex-mcp` rejects any
+line nested deeper than 128 levels before parsing it, and
+`transport.pipe_survives_hostile_input` (plus the `DepthGuard` and
+`IdRecovery` unit tests) prove the server answers with an error and keeps
+serving. Those run on every PR.
 
 ```bash
 ctest --test-dir build/debug -L hardening_slow --output-on-failure

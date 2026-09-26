@@ -18,6 +18,23 @@ bump means.
   memory/time/usability analysis), plus
   `scripts/measure_tokens.py` repro harness and a README highlight.
 
+### Fixed
+
+- `parsex-mcp` no longer crashes on a single hostile line. Requests nested
+  deeper than 128 levels are rejected before parsing with a `-32600` error
+  (previously ~100k levels overflowed the stack while reading `params`), and
+  id recovery for malformed lines no longer uses a recursive regex that
+  overflowed on a long unterminated id string. The server keeps serving
+  after either.
+- Release tarballs are built from an optimised Release configuration instead
+  of the Debug build.
+
+### Removed
+
+- `ResourceExhaustionTest.DeeplyNestedTransportRejects`, which only checked
+  its own loop and never exercised the server; replaced by
+  `transport.pipe_survives_hostile_input`.
+
 ## [0.1.0] - 2026-09-25
 
 ### Added

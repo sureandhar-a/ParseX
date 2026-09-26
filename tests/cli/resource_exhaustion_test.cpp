@@ -1,7 +1,10 @@
-// Resource limits (slow, nightly-only): oversized input and deeply nested
-// transport input must fail gracefully with bounded time/memory — never a
-// hang, crash, or stack overflow. Enforced limits documented here become
-// behavior: max file size before graceful rejection, max JSON depth.
+// Resource limits (slow, nightly-only): oversized input must fail gracefully
+// with bounded time/memory — never a hang or crash.
+//
+// Deeply nested transport input is covered against the real server instead:
+// parsex-mcp rejects any line nested deeper than kMaxJsonDepth (128) before
+// parsing it — see transport.pipe_survives_hostile_input and the DepthGuard
+// tests in tests/mcp/protocol_test.cpp. Those are fast and run on every PR.
 //
 // Excluded from default runs via hardening_slow label; runs on nightly/manual.
 #include <gtest/gtest.h>
@@ -56,21 +59,4 @@ TEST(ResourceExhaustionTest, OversizedInputFailsGracefully) {
     }
     std::error_code ignored;
     std::filesystem::remove(path, ignored);
-}
-
-TEST(ResourceExhaustionTest, DeeplyNestedTransportRejects) {
-    // 10k-deep nesting: bounded-depth rejection, not stack overflow.
-    std::string nested(10000, '{');
-    nested += std::string(10000, '}');
-    int depth = 0;
-    bool rejected = false;
-    for (char c : nested) {
-        if (c == '{') {
-            if (++depth > 500) {
-                rejected = true;
-                break;
-            }
-        }
-    }
-    EXPECT_TRUE(rejected) << "depth guard must trigger";
 }
