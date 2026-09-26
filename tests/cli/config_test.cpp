@@ -32,8 +32,10 @@ TEST(ConfigExtras, UnknownKeyIsIgnored) {
     app.set_config("--config", "", "Read a config file", false);
     // Not calling allow_config_extras -> default Ignore
 
-    fs::path cfg = tempConfig("schema-cache-dir=\"/tmp/from-config\"\nunknown-key=\"oops\"\n");
-    const char* argv[] = {"prog", "--config", cfg.c_str()};
+    const fs::path cfg = tempConfig("schema-cache-dir=\"/tmp/from-config\"\nunknown-key=\"oops\"\n");
+    // path::c_str() is wchar_t on Windows; CLI11 expects narrow char*.
+    const std::string cfgStr = cfg.string();
+    const char* argv[] = {"prog", "--config", cfgStr.c_str()};
     ASSERT_NO_THROW(app.parse(3, const_cast<char**>(argv)));
     EXPECT_EQ(schemaCacheDir, "/tmp/from-config");
     // Unknown key did not cause failure — documented Ignore behavior.
@@ -47,8 +49,10 @@ TEST(ConfigExtras, MisspelledKeySilentlyIgnoredSharpEdge) {
     app.set_config("--config", "", "Read a config file", false);
 
     // Intentional typo: schema-cach-dir (missing 'e')
-    fs::path cfg = tempConfig("schema-cach-dir=\"/tmp/typo-path\"\n");
-    const char* argv[] = {"prog", "--config", cfg.c_str()};
+    const fs::path cfg = tempConfig("schema-cach-dir=\"/tmp/typo-path\"\n");
+    // path::c_str() is wchar_t on Windows; CLI11 expects narrow char*.
+    const std::string cfgStr = cfg.string();
+    const char* argv[] = {"prog", "--config", cfgStr.c_str()};
     ASSERT_NO_THROW(app.parse(3, const_cast<char**>(argv)));
     // Typo is silently ignored — no error, value stays empty. This is the
     // known sharp edge when allow_config_extras is Ignore: CLI11 cannot warn
