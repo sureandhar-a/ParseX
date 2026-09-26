@@ -187,7 +187,7 @@ inline void emitTraceIfEnabled(const CliOptions& opts) {
 }
 
 // Call sites pass (cache dir, input) in documented order; names differ by role.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 inline void runParseCommand(const CliOptions& opts, int argc, char const* const* argv,
                             const std::string& schemaCacheDir, const std::string& parseInput) {
     applySchemaCacheDir(argc, argv, schemaCacheDir);
@@ -219,7 +219,6 @@ inline void runParseCommand(const CliOptions& opts, int argc, char const* const*
 }
 
 // Call sites pass (cache dir, input) in documented order; names differ by role.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 inline void runValidateCommand(const CliOptions& opts, int argc, char const* const* argv,
                                const std::string& schemaCacheDir, const std::string& validateInput,
                                bool validateStrict) {
@@ -272,7 +271,6 @@ inline void runValidateCommand(const CliOptions& opts, int argc, char const* con
 }
 
 // Call sites pass (cache dir, base, target) in documented order; names differ by role.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 inline void runDiffCommand(const CliOptions& opts, int argc, char const* const* argv,
                            const std::string& schemaCacheDir, const std::string& diffBase,
                            const std::string& diffTarget) {
@@ -310,7 +308,6 @@ inline void runDiffCommand(const CliOptions& opts, int argc, char const* const* 
 }
 
 // Call sites pass (cache dir, input, output) in documented order; names differ by role.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 inline void runWriteCommand(const CliOptions& opts, int argc, char const* const* argv,
                             const std::string& schemaCacheDir, const std::string& writeInput,
                             const std::string& writeOutput, bool writeApply) {
@@ -358,6 +355,7 @@ inline void runWriteCommand(const CliOptions& opts, int argc, char const* const*
     }
     emitTraceIfEnabled(opts);
 }
+// NOLINTEND(bugprone-easily-swappable-parameters)
 
 }  // namespace
 
