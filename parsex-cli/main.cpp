@@ -35,8 +35,8 @@ inline std::pair<std::filesystem::path, std::string> resolveSchemaCacheDir(
     int argc, char const* const* argv, const std::string& boundValue) {
     bool flagPresent = false;
     for (int idx = 1; idx < argc; ++idx) {
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): argv indexing is
-        // mandated by the OS main() contract; bounds are enforced by argc.
+        // argv indexing is mandated by the OS main() contract; bounds enforced by argc.
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         std::string arg = argv[idx];
         if (arg == "--schema-cache-dir" || arg.starts_with("--schema-cache-dir=")) {
             flagPresent = true;
@@ -186,6 +186,8 @@ inline void emitTraceIfEnabled(const CliOptions& opts) {
     }
 }
 
+// Call sites pass (cache dir, input) in documented order; names differ by role.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 inline void runParseCommand(const CliOptions& opts, int argc, char const* const* argv,
                             const std::string& schemaCacheDir, const std::string& parseInput) {
     applySchemaCacheDir(argc, argv, schemaCacheDir);
@@ -216,6 +218,8 @@ inline void runParseCommand(const CliOptions& opts, int argc, char const* const*
     emitTraceIfEnabled(opts);
 }
 
+// Call sites pass (cache dir, input) in documented order; names differ by role.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 inline void runValidateCommand(const CliOptions& opts, int argc, char const* const* argv,
                                const std::string& schemaCacheDir, const std::string& validateInput,
                                bool validateStrict) {
@@ -267,6 +271,8 @@ inline void runValidateCommand(const CliOptions& opts, int argc, char const* con
     // invocation or I/O (handled by top-level catch) causes non-zero.
 }
 
+// Call sites pass (cache dir, base, target) in documented order; names differ by role.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 inline void runDiffCommand(const CliOptions& opts, int argc, char const* const* argv,
                            const std::string& schemaCacheDir, const std::string& diffBase,
                            const std::string& diffTarget) {
@@ -303,6 +309,8 @@ inline void runDiffCommand(const CliOptions& opts, int argc, char const* const* 
     emitTraceIfEnabled(opts);
 }
 
+// Call sites pass (cache dir, input, output) in documented order; names differ by role.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 inline void runWriteCommand(const CliOptions& opts, int argc, char const* const* argv,
                             const std::string& schemaCacheDir, const std::string& writeInput,
                             const std::string& writeOutput, bool writeApply) {
@@ -353,9 +361,8 @@ inline void runWriteCommand(const CliOptions& opts, int argc, char const* const*
 
 }  // namespace
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity): main wires four subcommands;
-// per-command work lives in run*Command() helpers above, so the complexity is declarative
-// CLI11 setup, not branching logic.
+// Main wires four subcommands; per-command work lives in run*Command() helpers above.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 int main(int argc, char const* const* argv)
 {
     CLI::App app{"parsex - ARXML CAN parsing, validation, diffing and safe editing", "parsex"};
