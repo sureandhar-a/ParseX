@@ -72,17 +72,17 @@ std::optional<std::string> childText(const RawNode& node, const std::string& tag
 // leading-zero octal (`013` is 11), else decimal; `prefix` is the digits' offset.
 int literalBase(const std::string& digits, std::size_t& prefix) {
     prefix = 0;
-    if (digits.size() > 2 && digits[0] == '0') {
-        if (digits[1] == 'x' || digits[1] == 'X') {
+    if (digits.size() > 2 && digits.at(0) == '0') {
+        if (digits.at(1) == 'x' || digits.at(1) == 'X') {
             prefix = 2;
             return 16;
         }
-        if (digits[1] == 'b' || digits[1] == 'B') {
+        if (digits.at(1) == 'b' || digits.at(1) == 'B') {
             prefix = 2;
             return 2;
         }
     }
-    if (digits.size() > 1 && digits[0] == '0' &&
+    if (digits.size() > 1 && digits.at(0) == '0' &&
         digits.find_first_not_of("01234567") == std::string::npos) {
         prefix = 1;
         return 8;
