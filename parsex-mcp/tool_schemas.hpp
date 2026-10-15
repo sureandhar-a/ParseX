@@ -89,3 +89,35 @@ inline nlohmann::json writeOutputSchema() {
             {"required", nlohmann::json::array({"input", "output", "applied", "success"})},
             {"additionalProperties", false}};
 }
+
+inline nlohmann::json exportInputSchema() {
+    nlohmann::json path;
+    path["type"] = "string";
+    path["description"] = "Input ARXML file path";
+    nlohmann::json format;
+    format["type"] = "string";
+    format["enum"] = nlohmann::json::array({"dbc", "csv"});
+    format["description"] = "Export format";
+    return {{"type", "object"},
+            {"properties", {{"path", path}, {"format", format}}},
+            {"required", nlohmann::json::array({"path", "format"})},
+            {"additionalProperties", false}};
+}
+
+// Describes the exportResult envelope (structuredContent), like the other tools.
+inline nlohmann::json exportOutputSchema() {
+    return {{"type", "object"},
+            {"properties",
+             {{"kind", {{"const", "exportResult"}}},
+              {"payload",
+               {{"type", "object"},
+                {"properties",
+                 {{"sourcePath", {{"type", "string"}}},
+                  {"format", {{"type", "string"}, {"enum", nlohmann::json::array({"dbc", "csv"})}}},
+                  {"output", {{"type", nlohmann::json::array({"string", "null"})}}},
+                  {"counts", {{"type", "object"}}},
+                  {"warnings", {{"type", "array"}}},
+                  {"content", {{"type", "string"}}}}},
+                {"required", nlohmann::json::array({"sourcePath", "format", "output", "counts", "warnings"})}}}}},
+            {"required", nlohmann::json::array({"kind", "payload"})}};
+}

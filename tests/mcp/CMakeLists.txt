@@ -8,6 +8,7 @@ add_executable(mcp_tests
     dispatch_test.cpp
     parse_tools_test.cpp
     write_tools_test.cpp
+    export_tools_test.cpp
     version_test.cpp
     cancel_test.cpp
     approval_test.cpp
@@ -33,6 +34,7 @@ target_compile_definitions(
     PRIVATE
     PARSEX_MCP_BINARY="$<TARGET_FILE:parsex-mcp>"
     PARSEX_FIXTURES_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+    PARSEX_SCHEMAS_DIR="${CMAKE_SOURCE_DIR}/schemas"
 )
 
 add_dependencies(mcp_tests parsex-mcp)

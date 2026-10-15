@@ -1,6 +1,6 @@
 # ParseX — Spec
 
-Last updated: 2026-09-25
+Last updated: 2026-10-15
 Status: reconciled against as-built system (see status callouts per section)
 
 > Reconciliation note: sections below carry Implemented / Partial / Planned
@@ -119,6 +119,22 @@ Description: the common response envelope used by both command line and assistan
 **Acceptance criteria:**
  - All command-line / assistant responses use the envelope in `schemas/` (`contractVersion` tracked separately from the file's `autosarRelease`; `toolVersion` from the single version source), with exactly the payload for the report `kind`, plus `warnings` where applicable.
  - Protocol-specific fields live under a nested `protocolSpecific` object so common fields stay stable if/when non-CAN protocols are added later — the envelope is protocol-agnostic even though v1 only implements CAN objects.
+
+### Feature: DBC / CSV export
+Status: Implemented for single-file CAN networks (`parsex export`, MCP `export_arxml`, library `buildExportDatabase()` / `toDbc()` / `toCsv()`). Multiplexed, container and secured PDUs, signal groups and `CM_` comments are not exported (warned, see below).
+
+Description: export the CAN network of an ARXML file as a DBC database or a CSV table. The CAN identifiers, signal packing, scaling, units and senders are joined from the ARXML at export time; the domain model and the other engines are unchanged.
+
+**Acceptance criteria:**
+- Given an ARXML file with CAN frames, when exported as DBC, then each frame (identifier, extended flag, length, senders), signal (start bit, length, byte order, signedness, factor, offset, limits, unit, receivers, value table) matches what an independent DBC/ARXML reader (cantools) reads from the same file. Verified on `tests/fixtures/system-4.2.arxml` with `scripts/check_dbc_against_cantools.py`.
+- Given the same file, when exported as CSV, then the output is RFC 4180 with CRLF line endings and one row per signal.
+- Given an export request without an output path, when run, then the text is written to stdout and nothing is written to disk. The MCP tool is read-only and always returns the text inline.
+- Given a frame or signal that cannot be exported, when the export runs, then the export still completes and the problem is reported as a warning (never a silent drop).
+
+**Edge cases considered:**
+- A frame with no `CAN-FRAME-TRIGGERING` identifier is skipped with a warning.
+- A PDU that is multiplexed, a container, secured or otherwise unknown leaves its frame in the output with no signals from that PDU, plus a warning.
+- A frame with no signals still produces one CSV row with empty signal columns.
 
 ## Cross-cutting non-functional requirements
 

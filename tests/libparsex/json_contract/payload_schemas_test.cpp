@@ -53,6 +53,10 @@ void schemaLoader(const nlohmann::json_uri& uri, nlohmann::json& value) {
         value = loadJsonFile(dir / "telemetry_report.schema.json");
         return;
     }
+    if (id.find("export_result") != std::string::npos) {
+        value = loadJsonFile(dir / "export_result.schema.json");
+        return;
+    }
     throw std::runtime_error("schemaLoader: unrecognized ref " + id);
 }
 
@@ -147,10 +151,11 @@ nlohmann::json envelopeFor(const std::string& kind, nlohmann::json payload) {
 
 }  // namespace
 
-TEST(PayloadSchemasTest, AllThreeSchemasAreWellFormed) {
+TEST(PayloadSchemasTest, AllPayloadSchemasAreWellFormed) {
     const fs::path dir = schemasDir();
     for (const char* file :
-         {"validation_result.schema.json", "diff_report.schema.json", "telemetry_report.schema.json"}) {
+         {"validation_result.schema.json", "diff_report.schema.json", "telemetry_report.schema.json",
+          "export_result.schema.json"}) {
         const fs::path path = dir / file;
         ASSERT_TRUE(fs::exists(path)) << path;
         nlohmann::json schema = nullptr;
@@ -207,4 +212,40 @@ TEST(PayloadSchemasTest, CrossKindPayloadFailsConditional) {
     // validationResult kind carrying a telemetry-shaped payload must NOT validate.
     EXPECT_FALSE(
         validatesAgainst(envelopeSchema, envelopeFor("validationResult", telemetryPayload())));
+}
+
+namespace {
+
+nlohmann::json exportPayload(bool toFile) {
+    nlohmann::json payload{
+        {"sourcePath", "net.arxml"},
+        {"format", "dbc"},
+        {"output", toFile ? nlohmann::json("out.dbc") : nlohmann::json(nullptr)},
+        {"counts", nlohmann::json{{"frames", 2}, {"signals", 5}}},
+        {"warnings", nlohmann::json::array({nlohmann::json{{"message", "unresolved sender"}}})},
+    };
+    if (!toFile) {
+        payload["content"] = "VERSION \"\"\n";
+    }
+    return payload;
+}
+
+}  // namespace
+
+TEST(PayloadSchemasTest, EnvelopeSelectsExportResultSchema) {
+    const nlohmann::json envelopeSchema = loadJsonFile(schemasDir() / "envelope.schema.json");
+    EXPECT_TRUE(validatesAgainst(envelopeSchema, envelopeFor("exportResult", exportPayload(false))));
+    EXPECT_TRUE(validatesAgainst(envelopeSchema, envelopeFor("exportResult", exportPayload(true))));
+}
+
+TEST(PayloadSchemasTest, ExportResultRejectsMalformedPayloads) {
+    const nlohmann::json envelopeSchema = loadJsonFile(schemasDir() / "envelope.schema.json");
+    nlohmann::json badFormat = exportPayload(true);
+    badFormat["format"] = "xml";
+    EXPECT_FALSE(validatesAgainst(envelopeSchema, envelopeFor("exportResult", badFormat)));
+    nlohmann::json noCounts = exportPayload(true);
+    noCounts.erase("counts");
+    EXPECT_FALSE(validatesAgainst(envelopeSchema, envelopeFor("exportResult", noCounts)));
+    EXPECT_FALSE(validatesAgainst(envelopeSchema, envelopeFor("exportResult", validationPayload())));
+    EXPECT_FALSE(validatesAgainst(envelopeSchema, envelopeFor("validationResult", exportPayload(true))));
 }

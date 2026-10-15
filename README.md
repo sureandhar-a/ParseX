@@ -4,7 +4,7 @@
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-ParseX is an ARXML parsing, validation, diffing, and safe editing toolkit built specifically for AUTOSAR XML semantics. Unlike a generic XML tool, it understands AUTOSAR schema versions through a shared schema registry and exposes the same core engine through both a scriptable command line and an assistant-facing server.
+ParseX is an ARXML parsing, validation, diffing, safe editing, and DBC/CSV export toolkit built specifically for AUTOSAR XML semantics. Unlike a generic XML tool, it understands AUTOSAR schema versions through a shared schema registry and exposes the same core engine through both a scriptable command line and an assistant-facing server.
 
 ParseX is for engineers working with AUTOSAR Classic Platform files who need trustworthy automation: parsing files into a typed domain model, validating them against official schemas and CAN rules, comparing two files structurally, and writing changes back safely with a dry-run by default.
 
@@ -134,6 +134,20 @@ For machine-readable output, put `--json` before the subcommand (see [command-li
 ```bash
 build/debug/parsex-cli/parsex-cli --json parse --input examples/sample.arxml
 ```
+
+Export the CAN network of a file as a DBC or CSV. Without `--output` the text goes to stdout; with `--output` it is written to the file and a one-line summary is printed. Warnings about anything that could not be exported go to stderr. Shown with the CAN FD fixture from the test suite:
+
+```bash
+build/debug/parsex-cli/parsex-cli export --input tests/fixtures/system-4.2.arxml --format dbc --output system.dbc
+# Exported 8 frames, 11 signals to system.dbc (dbc)
+
+build/debug/parsex-cli/parsex-cli export -i tests/fixtures/system-4.2.arxml -f csv | head -3
+# frame,frame_id,extended,can_fd,length,transmitters,signal,start_bit,bit_length,byte_order,signed,factor,offset,min,max,unit,init_value,receivers,value_table
+# MultiplexedMessage,0x4,false,true,2,,,,,,,,,,,,,,
+# Message1,0x5,false,true,9,DJ,message1_SeqCounter,0,16,little_endian,false,1,0,,,,,Dancer,
+```
+
+See the [command-line reference](docs/cli.md#export--export-the-can-network-as-dbc-or-csv) for the export options and the `exportResult` JSON shape.
 
 Note: richer study-vocabulary fixtures such as `tests/fixtures/parsefile_complete.arxml` parse with real domain counts but intentionally fail official-schema validation. That gap is documented under Known limitations below.
 

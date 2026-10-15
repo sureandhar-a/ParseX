@@ -2,11 +2,15 @@
 
 #include <filesystem>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
 #include <nlohmann/json.hpp>
 
 #include <parsex/diff/diff_engine.hpp>
+#include <parsex/export/can_db.hpp>
+#include <parsex/export/csv_writer.hpp>
+#include <parsex/export/dbc_writer.hpp>
 #include <parsex/json_contract/envelope.hpp>
 #include <parsex/parser/parser.hpp>
 #include <parsex/schema/schema_registry.hpp>
@@ -199,5 +203,48 @@ inline nlohmann::json writeTool(const nlohmann::json& args) {
     nlohmann::json packed;
     packed["structuredContent"] = writeEnvelope(inPath, outPath, false, success);
     packed["summary"] = humanWriteSummary(inPath, outPath, false);
+    return packed;
+}
+
+// --- Export (read-only: text is returned inline, never written to disk) ---
+
+inline std::size_t exportSignalCount(const ExportDatabase& database) {
+    std::size_t total = 0;
+    for (const auto& frame : database.frames) {
+        total += frame.signals.size();
+    }
+    return total;
+}
+
+inline nlohmann::json exportTool(const nlohmann::json& args) {
+    const std::string path = args.at("path").get<std::string>();
+    const std::string format = args.at("format").get<std::string>();
+    if (format != "dbc" && format != "csv") {
+        throw std::invalid_argument("format must be \"dbc\" or \"csv\"");
+    }
+    Parser parser;
+    const ExportDatabase database = buildExportDatabase(parser.parseFile(std::filesystem::path(path)));
+    const std::size_t signalCount = exportSignalCount(database);
+    nlohmann::json payload;
+    payload["sourcePath"] = path;
+    payload["format"] = format;
+    payload["output"] = nullptr;
+    payload["counts"] = {{"frames", database.frames.size()}, {"signals", signalCount}};
+    nlohmann::json warnings = nlohmann::json::array();
+    for (const auto& warning : database.warnings) {
+        warnings.push_back({{"message", warning.message}});
+    }
+    payload["warnings"] = std::move(warnings);
+    payload["content"] = format == "dbc" ? toDbc(database) : toCsv(database);
+    std::ostringstream summary;
+    summary << "Exported " << database.frames.size() << " frames, " << signalCount << " signals as "
+            << format << " from " << path;
+    if (!database.warnings.empty()) {
+        summary << " (" << database.warnings.size() << " warnings)";
+    }
+    nlohmann::json packed;
+    packed["structuredContent"] =
+        parsex::json_contract::wrapEnvelope("exportResult", std::move(payload));
+    packed["summary"] = summary.str();
     return packed;
 }

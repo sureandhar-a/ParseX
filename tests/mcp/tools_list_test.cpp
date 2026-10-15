@@ -3,15 +3,16 @@
 #include "server.hpp"
 #include "tool_registry.hpp"
 
-TEST(ToolListing, ReturnsAllFourWithAnnotationsInOrder) {
+TEST(ToolListing, ReturnsAllFiveWithAnnotationsInOrder) {
     ToolRegistry registry = ToolRegistry::withSchemas();
     nlohmann::json result = buildToolsListResult(registry);
     ASSERT_TRUE(result["tools"].is_array());
-    ASSERT_EQ(result["tools"].size(), 4);
+    ASSERT_EQ(result["tools"].size(), 5);
     EXPECT_EQ(result["tools"][0]["name"], "parse_arxml");
     EXPECT_EQ(result["tools"][1]["name"], "validate_arxml");
     EXPECT_EQ(result["tools"][2]["name"], "diff_arxml");
     EXPECT_EQ(result["tools"][3]["name"], "write_arxml");
+    EXPECT_EQ(result["tools"][4]["name"], "export_arxml");
     for (std::size_t i = 0; i < 3; ++i) {
         EXPECT_EQ(result["tools"][i]["annotations"]["readOnlyHint"], true);
         EXPECT_EQ(result["tools"][i]["annotations"]["destructiveHint"], false);
@@ -22,6 +23,11 @@ TEST(ToolListing, ReturnsAllFourWithAnnotationsInOrder) {
     EXPECT_EQ(result["tools"][3]["annotations"]["destructiveHint"], true);
     EXPECT_EQ(result["tools"][3]["annotations"]["idempotentHint"], false);
     EXPECT_EQ(result["tools"][3]["annotations"]["openWorldHint"], false);
+    // export_arxml is read-only: text is returned inline, nothing is written.
+    EXPECT_EQ(result["tools"][4]["annotations"]["readOnlyHint"], true);
+    EXPECT_EQ(result["tools"][4]["annotations"]["destructiveHint"], false);
+    EXPECT_EQ(result["tools"][4]["annotations"]["idempotentHint"], true);
+    EXPECT_EQ(result["tools"][4]["annotations"]["openWorldHint"], false);
 }
 
 TEST(ToolListing, AcceptsCursorWithoutError) {
@@ -40,7 +46,7 @@ TEST(WriteAnnotations, GuardedFromSilentRegression) {
     EXPECT_EQ(write->annotations["idempotentHint"], false);
     EXPECT_EQ(write->annotations["openWorldHint"], false);
     nlohmann::json listed = buildToolsListResult(registry);
-    ASSERT_EQ(listed["tools"].size(), 4);
+    ASSERT_EQ(listed["tools"].size(), 5);
     EXPECT_EQ(listed["tools"][3]["annotations"], write->annotations);
 }
 

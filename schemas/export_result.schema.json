@@ -1,0 +1,48 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://parsex.dev/schemas/v1/export_result.json",
+    "title": "ParseX exportResult Payload",
+    "description": "Kind-specific payload for kind=exportResult, emitted by 'parsex export' and the MCP export_arxml tool. 'output' is the path the text was written to, or null when it was not written to a file; 'content' carries the exported text and is present only when 'output' is null. 'output' is a deliberate exception to omit-don't-null (CONVENTIONS.md): it states 'not written to a file' explicitly rather than by omission.",
+    "type": "object",
+    "properties": {
+        "sourcePath": {
+            "type": "string",
+            "description": "ARXML file the export was built from."
+        },
+        "format": {
+            "type": "string",
+            "enum": ["dbc", "csv"]
+        },
+        "output": {
+            "type": ["string", "null"],
+            "description": "Path the exported text was written to; null when it was not written to a file."
+        },
+        "counts": {
+            "type": "object",
+            "properties": {
+                "frames": {"type": "integer", "minimum": 0},
+                "signals": {"type": "integer", "minimum": 0}
+            },
+            "required": ["frames", "signals"],
+            "additionalProperties": false
+        },
+        "warnings": {
+            "type": "array",
+            "description": "Things that could not be resolved during export, and why.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string"}
+                },
+                "required": ["message"],
+                "additionalProperties": false
+            }
+        },
+        "content": {
+            "type": "string",
+            "description": "Exported DBC/CSV text; present only when output is null."
+        }
+    },
+    "required": ["sourcePath", "format", "output", "counts", "warnings"],
+    "additionalProperties": false
+}

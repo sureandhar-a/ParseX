@@ -7,8 +7,12 @@
 #include <nlohmann/json.hpp>
 #include "parsex/diff/diff_engine.hpp"
 #include "parsex/diff/diff_report.hpp"
+#include "parsex/export/can_db.hpp"
+#include "parsex/export/csv_writer.hpp"
+#include "parsex/export/dbc_writer.hpp"
 #include "parsex/json_contract/envelope.hpp"
 #include "parsex/parser/parser.hpp"
+#include "parsex/schema/atomic_write.hpp"
 #include "parsex/schema/cache_layout.hpp"
 #include "parsex/schema/schema_registry.hpp"
 #include "parsex/telemetry/scoped_span.hpp"
@@ -173,6 +177,37 @@ inline nlohmann::json buildJsonWrite(const std::filesystem::path& input, const s
     payload["success"] = success;
     return parsex::json_contract::wrapEnvelope("writeResult", std::move(payload));
 }
+
+inline std::size_t exportSignalCount(const ExportDatabase& database) {
+    std::size_t total = 0;
+    for (const auto& frame : database.frames) {
+        total += frame.signals.size();
+    }
+    return total;
+}
+
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+// Format, output path and text are all plain strings; the single caller passes them by position.
+// outputPath empty = text not written to a file (content is inlined instead).
+inline nlohmann::json buildJsonExport(const std::filesystem::path& input, const std::string& format,
+                                      const std::string& outputPath, const ExportDatabase& database,
+                                      const std::string& text) {
+    nlohmann::json payload;
+    payload["sourcePath"] = input.string();
+    payload["format"] = format;
+    payload["output"] = outputPath.empty() ? nlohmann::json(nullptr) : nlohmann::json(outputPath);
+    payload["counts"] = {{"frames", database.frames.size()}, {"signals", exportSignalCount(database)}};
+    nlohmann::json warnings = nlohmann::json::array();
+    for (const auto& warning : database.warnings) {
+        warnings.push_back({{"message", warning.message}});
+    }
+    payload["warnings"] = std::move(warnings);
+    if (outputPath.empty()) {
+        payload["content"] = text;
+    }
+    return parsex::json_contract::wrapEnvelope("exportResult", std::move(payload));
+}
+// NOLINTEND(bugprone-easily-swappable-parameters)
 
 struct CliOptions {
     bool jsonOutput{false};
@@ -355,15 +390,61 @@ inline void runWriteCommand(const CliOptions& opts, int argc, char const* const*
     }
     emitTraceIfEnabled(opts);
 }
+// Call sites pass (cache dir, input, format, output) in documented order; names differ by role.
+inline void runExportCommand(const CliOptions& opts, int argc, char const* const* argv,
+                             const std::string& schemaCacheDir, const std::string& exportInput,
+                             const std::string& exportFormat, const std::string& exportOutput) {
+    applySchemaCacheDir(argc, argv, schemaCacheDir);
+    parsex::telemetry::TelemetryConfig::setEnabled(opts.trace);
+    if (opts.trace) {
+        parsex::telemetry::TelemetryContext::reset();
+    }
+    const std::filesystem::path inPath(exportInput);
+    ExportDatabase database;
+    std::string text;
+    std::exception_ptr pendingException;
+    {
+        parsex::telemetry::ScopedSpan span("parsex-cli.export");
+        try {
+            Parser parser;
+            database = buildExportDatabase(parser.parseFile(inPath));
+            text = exportFormat == "dbc" ? toDbc(database) : toCsv(database);
+            if (!exportOutput.empty()) {
+                writeCacheAtomically(std::filesystem::path(exportOutput), text);
+            }
+        } catch (...) {
+            pendingException = std::current_exception();
+        }
+    }
+    if (pendingException) {
+        emitTraceIfEnabled(opts);
+        std::rethrow_exception(pendingException);
+    }
+    if (opts.jsonOutput) {
+        std::cout << buildJsonExport(inPath, exportFormat, exportOutput, database, text).dump(2) << "\n";
+    } else {
+        for (const auto& warning : database.warnings) {
+            std::cerr << "parsex: warning: " << warning.message << "\n";
+        }
+        if (exportOutput.empty()) {
+            std::cout << text;
+        } else {
+            std::cout << "Exported " << database.frames.size() << " frames, "
+                      << exportSignalCount(database) << " signals to " << exportOutput << " ("
+                      << exportFormat << ")\n";
+        }
+    }
+    emitTraceIfEnabled(opts);
+}
 // NOLINTEND(bugprone-easily-swappable-parameters)
 
 }  // namespace
 
-// Main wires four subcommands; per-command work lives in run*Command() helpers above.
+// Main wires five subcommands; per-command work lives in run*Command() helpers above.
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 int main(int argc, char const* const* argv)
 {
-    CLI::App app{"parsex - ARXML CAN parsing, validation, diffing and safe editing", "parsex"};
+    CLI::App app{"parsex - ARXML CAN parsing, validation, diffing, safe editing and DBC/CSV export", "parsex"};
 
     // NOTE: set_version_flag on the top-level app only fires at the top level
     // by default (e.g. `parsex --version` works; `parsex parse --version` does
@@ -394,6 +475,7 @@ int main(int argc, char const* const* argv)
     auto* validateCmd = app.add_subcommand("validate", "Validate an ARXML file against ParseX rules (exit 0 on run; check payload.passed / human summary for findings; --strict makes warnings fail)");
     auto* diffCmd = app.add_subcommand("diff", "Diff two ARXML files");
     auto* writeCmd = app.add_subcommand("write", "Apply a safe edit to an ARXML file (dry-run by default; use --apply to write)");
+    auto* exportCmd = app.add_subcommand("export", "Export an ARXML file's CAN network as DBC or CSV (stdout unless --output)");
 
     // Shared input-path options with CLI11 built-in existence validation.
     // Bad paths fail fast at parse time before any engine code runs. Error
@@ -407,6 +489,9 @@ int main(int argc, char const* const* argv)
     bool writeApply{false};
     std::string diffBase;
     std::string diffTarget;
+    std::string exportInput;
+    std::string exportFormat;
+    std::string exportOutput;
     parseCmd->add_option("--input,-i", parseInput, "Input ARXML file")->required()->check(CLI::ExistingFile);
     validateCmd->add_option("--input,-i", validateInput, "Input ARXML file")->required()->check(CLI::ExistingFile);
     // PAR-225: --strict sequences Parser before Validator per lld.md (validate --strict, then parse).
@@ -419,6 +504,9 @@ int main(int argc, char const* const* argv)
     writeCmd->add_flag("--apply", writeApply, "Actually write the file (without this, dry-run only)");
     diffCmd->add_option("--base", diffBase, "Base ARXML file")->required()->check(CLI::ExistingFile);
     diffCmd->add_option("--target", diffTarget, "Target ARXML file")->required()->check(CLI::ExistingFile);
+    exportCmd->add_option("--input,-i", exportInput, "Input ARXML file")->required()->check(CLI::ExistingFile);
+    exportCmd->add_option("--format,-f", exportFormat, "Export format")->required()->check(CLI::IsMember({"dbc", "csv"}));
+    exportCmd->add_option("--output,-o", exportOutput, "Write the export to this file instead of stdout");
     parseCmd->callback([&]() {
         runParseCommand(opts, argc, argv, schemaCacheDir, parseInput);
     });
@@ -431,10 +519,14 @@ int main(int argc, char const* const* argv)
     writeCmd->callback([&]() {
         runWriteCommand(opts, argc, argv, schemaCacheDir, writeInput, writeOutput, writeApply);
     });
+    exportCmd->callback([&]() {
+        runExportCommand(opts, argc, argv, schemaCacheDir, exportInput, exportFormat, exportOutput);
+    });
     (void)parseCmd;
     (void)validateCmd;
     (void)diffCmd;
     (void)writeCmd;
+    (void)exportCmd;
 
     // PAR-220: CLI11 built-in config-file support (TOML-like). Empty default
     // (not required) so the tool works without one. Leave

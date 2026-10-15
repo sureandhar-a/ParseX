@@ -45,6 +45,21 @@ add_test(NAME cli.write_help
 set_tests_properties(cli.write_help PROPERTIES
     PASS_REGULAR_EXPRESSION "write")
 
+add_test(NAME cli.export_help
+    COMMAND $<TARGET_FILE:parsex-cli> export --help)
+set_tests_properties(cli.export_help PROPERTIES
+    PASS_REGULAR_EXPRESSION "--format")
+
+add_test(NAME cli.export_invalid_format
+    COMMAND bash -c "out=$(\"$0\" export --input \"${CMAKE_SOURCE_DIR}/tests/fixtures/system-4.2.arxml\" --format xml 2>&1); code=$?; echo \"$out\"; test $code -ne 0" $<TARGET_FILE:parsex-cli>)
+set_tests_properties(cli.export_invalid_format PROPERTIES
+    PASS_REGULAR_EXPRESSION "--format")
+
+add_test(NAME cli.export_json_output
+    COMMAND $<TARGET_FILE:parsex-cli> --json export --input ${CMAKE_SOURCE_DIR}/tests/fixtures/system-4.2.arxml --format dbc)
+set_tests_properties(cli.export_json_output PROPERTIES
+    PASS_REGULAR_EXPRESSION "exportResult")
+
 add_test(NAME cli.version
     COMMAND $<TARGET_FILE:parsex-cli> --version)
 set_tests_properties(cli.version PROPERTIES

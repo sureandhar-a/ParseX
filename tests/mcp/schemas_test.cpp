@@ -3,9 +3,9 @@
 #include "tool_registry.hpp"
 #include "tool_schemas.hpp"
 
-TEST(Schemas, AllFourHaveCompletePairs) {
+TEST(Schemas, AllFiveHaveCompletePairs) {
     ToolRegistry registry = ToolRegistry::withSchemas();
-    EXPECT_EQ(registry.size(), 4);
+    EXPECT_EQ(registry.size(), 5);
 
     const ToolDefinition* parse = registry.find("parse_arxml");
     ASSERT_NE(parse, nullptr);
@@ -31,6 +31,12 @@ TEST(Schemas, AllFourHaveCompletePairs) {
     EXPECT_TRUE(write->inputSchema["properties"].contains("outputPath"));
     EXPECT_TRUE(write->inputSchema["properties"].contains("apply"));
     ASSERT_TRUE(write->outputSchema.has_value());
+
+    const ToolDefinition* exportTool = registry.find("export_arxml");
+    ASSERT_NE(exportTool, nullptr);
+    EXPECT_TRUE(exportTool->inputSchema["properties"].contains("path"));
+    EXPECT_TRUE(exportTool->inputSchema["properties"].contains("format"));
+    ASSERT_TRUE(exportTool->outputSchema.has_value());
 }
 
 TEST(Schemas, InputsAreClosedObjects) {
@@ -38,6 +44,10 @@ TEST(Schemas, InputsAreClosedObjects) {
     EXPECT_EQ(validateInputSchema()["additionalProperties"], false);
     EXPECT_EQ(diffInputSchema()["additionalProperties"], false);
     EXPECT_EQ(writeInputSchema()["additionalProperties"], false);
+    EXPECT_EQ(exportInputSchema()["additionalProperties"], false);
+    EXPECT_EQ(exportInputSchema()["required"], nlohmann::json::array({"path", "format"}));
+    EXPECT_EQ(exportInputSchema()["properties"]["format"]["enum"],
+              nlohmann::json::array({"dbc", "csv"}));
     EXPECT_EQ(writeInputSchema()["properties"]["apply"]["default"], false);
     EXPECT_EQ(validateInputSchema()["properties"]["strict"]["default"], false);
 }
