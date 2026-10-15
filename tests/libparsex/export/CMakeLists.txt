@@ -1,0 +1,18 @@
+add_executable(export_tests
+    can_db_test.cpp
+    dbc_writer_test.cpp
+    csv_writer_test.cpp
+)
+target_compile_definitions(
+    export_tests
+    PRIVATE
+    PARSEX_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+)
+target_link_libraries(
+    export_tests
+    PRIVATE
+    libparsex
+    GTest::gtest
+    GTest::gtest_main
+)
+gtest_discover_tests(export_tests)
