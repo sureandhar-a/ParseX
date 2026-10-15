@@ -22,17 +22,18 @@ constexpr std::array kNewSymbols = {
 // std::to_chars is locale-free and yields the shortest string that round-trips.
 std::string num(double value) {
     std::array<char, 40> buffer{};
-    const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
+    const auto result = std::to_chars(buffer.begin(), buffer.end(), value);
     return {buffer.data(), result.ptr};
 }
 
 // Names go into whitespace-delimited DBC tokens; anything else would corrupt the file.
 std::string ident(const std::string& name) {
     std::string out = name;
-    for (char& c : out) {
-        const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
-        if (!ok) {
-            c = '_';
+    for (char& letter : out) {
+        const bool valid = (letter >= 'a' && letter <= 'z') || (letter >= 'A' && letter <= 'Z') || (letter >= '0' && letter <= '9') ||
+                           letter == '_';
+        if (!valid) {
+            letter = '_';
         }
     }
     if (out.empty() || (out.front() >= '0' && out.front() <= '9')) {
@@ -44,11 +45,11 @@ std::string ident(const std::string& name) {
 // Inside a quoted DBC string only '"' and '\' need protecting.
 std::string quoted(const std::string& text) {
     std::string out = "\"";
-    for (const char c : text) {
-        if (c == '"' || c == '\\') {
+    for (const char letter : text) {
+        if (letter == '"' || letter == '\\') {
             out += '\\';
         }
-        out += c;
+        out += letter;
     }
     out += '"';
     return out;
@@ -87,7 +88,7 @@ void appendSignal(std::string& out, const ExportSignal& signal) {
 }
 
 void appendFdAttributes(std::string& out, const ExportDatabase& database) {
-    out += "BA_DEF_ BO_ \"VFrameFormat\" ENUM \"StandardCAN\",\"ExtendedCAN\"";
+    out += R"(BA_DEF_ BO_ "VFrameFormat" ENUM "StandardCAN","ExtendedCAN")";
     for (int i = 0; i < 12; ++i) {
         out += ",\"reserved\"";
     }

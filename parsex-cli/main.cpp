@@ -186,6 +186,8 @@ inline std::size_t exportSignalCount(const ExportDatabase& database) {
     return total;
 }
 
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+// Format, output path and text are all plain strings; the single caller passes them by position.
 // outputPath empty = text not written to a file (content is inlined instead).
 inline nlohmann::json buildJsonExport(const std::filesystem::path& input, const std::string& format,
                                       const std::string& outputPath, const ExportDatabase& database,
@@ -205,6 +207,7 @@ inline nlohmann::json buildJsonExport(const std::filesystem::path& input, const 
     }
     return parsex::json_contract::wrapEnvelope("exportResult", std::move(payload));
 }
+// NOLINTEND(bugprone-easily-swappable-parameters)
 
 struct CliOptions {
     bool jsonOutput{false};

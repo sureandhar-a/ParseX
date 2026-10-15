@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
+#include <exception>
 #include <map>
 #include <optional>
 #include <string>
@@ -72,15 +72,27 @@ std::vector<std::string> refNames(const RawNode& node, const std::string& tag) {
     std::vector<const RawNode*> refs;
     collectDescendants(node, tag, refs);
     std::vector<std::string> names;
+    names.reserve(refs.size());
     for (const RawNode* ref : refs) {
         names.push_back(shortNameOfRef(ref->text));
     }
     return names;
 }
 
+// Whole-string unsigned integer in the given base, as a double.
+std::optional<double> parseUnsigned(const std::string& digits, int base) {
+    try {
+        std::size_t consumed = 0;
+        const unsigned long long value = std::stoull(digits, &consumed, base);
+        return consumed == digits.size() ? std::optional<double>{static_cast<double>(value)} : std::nullopt;
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
 // AUTOSAR numeric literals may be 0x-hex or 0b-binary (system-4.2 has
 // `<LENGTH>0b11</LENGTH>`), which the model builder's parsers reject.
-// "0" alone and decimals like "0.1" stay on the strtod path.
+// "0" alone and decimals like "0.1" stay on the stod path.
 std::optional<double> parseDouble(const std::string& raw) {
     const std::string text = trimText(raw);
     if (text.empty()) {
@@ -91,19 +103,19 @@ std::optional<double> parseDouble(const std::string& raw) {
     // The AUTOSAR integer pattern also allows octal: `<LENGTH>013</LENGTH>` is 11.
     const bool octal = text.size() > 1 && text.find_first_not_of("01234567") == std::string::npos &&
                        text[0] == '0';
-    char* end = nullptr;
-    double value = 0.0;
     if (binary || hex) {
-        value = static_cast<double>(std::strtoull(text.c_str() + 2, &end, binary ? 2 : 16));
-    } else if (octal) {
-        value = static_cast<double>(std::strtoull(text.c_str() + 1, &end, 8));
-    } else {
-        value = std::strtod(text.c_str(), &end);
+        return parseUnsigned(text.substr(2), binary ? 2 : 16);
     }
-    if (end != text.c_str() + text.size()) {
+    if (octal) {
+        return parseUnsigned(text.substr(1), 8);
+    }
+    try {
+        std::size_t consumed = 0;
+        const double value = std::stod(text, &consumed);
+        return consumed == text.size() ? std::optional<double>{value} : std::nullopt;
+    } catch (const std::exception&) {
         return std::nullopt;
     }
-    return value;
 }
 
 std::optional<std::uint32_t> parseId(const std::string& raw) {
@@ -114,10 +126,9 @@ std::optional<std::uint32_t> parseId(const std::string& raw) {
     return static_cast<std::uint32_t>(*value);
 }
 
-std::int64_t asInteger(double value, bool& ok) {
+std::optional<std::int64_t> asInteger(double value) {
     const auto whole = static_cast<std::int64_t>(value);
-    ok = static_cast<double>(whole) == value;
-    return whole;
+    return static_cast<double>(whole) == value ? std::optional<std::int64_t>{whole} : std::nullopt;
 }
 
 void addUnique(std::vector<std::string>& list, const std::string& name) {
@@ -154,6 +165,8 @@ struct Index {
     std::unordered_map<std::string, bool> bigEndian;
 };
 
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+// Package path and ECU name are both plain strings; one internal recursive caller, order is fixed.
 void buildIndex(const RawNode& node, const std::string& pkgPath, const std::string& ecu,
                 Index& index) {
     const std::string& tag = node.tagName;
@@ -189,6 +202,7 @@ void buildIndex(const RawNode& node, const std::string& pkgPath, const std::stri
         std::vector<const RawNode*> refs;
         collectDescendants(node, "ASSOCIATED-COM-I-PDU-GROUP-REF", refs);
         std::vector<std::string> paths;
+        paths.reserve(refs.size());
         for (const RawNode* ref : refs) {
             paths.push_back(trimText(ref->text));
         }
@@ -201,6 +215,7 @@ void buildIndex(const RawNode& node, const std::string& pkgPath, const std::stri
         buildIndex(*child, childPkg, childEcu, index);
     }
 }
+// NOLINTEND(bugprone-easily-swappable-parameters)
 
 struct Scaling {
     double factor = 1.0;
@@ -210,6 +225,70 @@ struct Scaling {
     std::string unit;
     std::vector<ValueTableEntry> valueTable;
 };
+
+std::vector<const RawNode*> childNodes(const RawNode* parent) {
+    std::vector<const RawNode*> nodes;
+    if (parent == nullptr) {
+        return nodes;
+    }
+    nodes.reserve(parent->children.size());
+    for (const auto& value : parent->children) {
+        nodes.push_back(value.get());
+    }
+    return nodes;
+}
+
+// [lower, upper] of a linear scale mapped to physical units, when both limits parse.
+void applyLimits(const RawNode& scale, Scaling& out) {
+    const auto lower = parseDouble(childText(scale, "LOWER-LIMIT"));
+    const auto upper = parseDouble(childText(scale, "UPPER-LIMIT"));
+    if (!lower || !upper) {
+        return;
+    }
+    double low = *lower * out.factor + out.offset;
+    double high = *upper * out.factor + out.offset;
+    if (out.factor < 0) {
+        std::swap(low, high);
+    }
+    out.min = low;
+    out.max = high;
+}
+
+// Takes the scale as the linear (offset, factor) when it has exactly two
+// numerators; returns false and leaves `out` untouched otherwise.
+bool applyLinearScale(const RawNode& scale, Scaling& out) {
+    const RawNode& coeffs = *findChild(scale, "COMPU-RATIONAL-COEFFS");
+    const auto numerators = childNodes(findChild(coeffs, "COMPU-NUMERATOR"));
+    const auto denominators = childNodes(findChild(coeffs, "COMPU-DENOMINATOR"));
+    const std::optional<double> divisor =
+        denominators.empty() ? std::optional<double>{1.0} : parseDouble(denominators.front()->text);
+    if (numerators.size() != 2 || !divisor || *divisor == 0.0) {
+        return false;
+    }
+    const auto constant = parseDouble(numerators[0]->text);
+    const auto slope = parseDouble(numerators[1]->text);
+    if (!constant || !slope) {
+        return false;
+    }
+    out.offset = *constant / *divisor;
+    out.factor = *slope / *divisor;
+    applyLimits(scale, out);
+    return true;
+}
+
+// A COMPU-CONST/VT scale with lower == upper is one "value = label" row.
+void addTextTableEntry(const RawNode& scale, Scaling& out) {
+    const RawNode* constant = findChild(scale, "COMPU-CONST");
+    const RawNode* label = constant == nullptr ? nullptr : findChild(*constant, "VT");
+    const auto lower = parseDouble(childText(scale, "LOWER-LIMIT"));
+    const auto upper = parseDouble(childText(scale, "UPPER-LIMIT"));
+    if (label == nullptr || !lower || !upper || *lower != *upper) {
+        return;
+    }
+    if (const auto value = asInteger(*lower)) {
+        out.valueTable.push_back({*value, trimText(label->text)});
+    }
+}
 
 // Linear scale and value table from a COMPU-METHOD. Only COMPU-SCALEs with
 // exactly two numerators count as linear (offset, factor); others (e.g. a
@@ -221,53 +300,10 @@ void applyCompuMethod(const RawNode& method, Scaling& out) {
     for (const RawNode* scale : scales) {
         const RawNode* coeffs = findChild(*scale, "COMPU-RATIONAL-COEFFS");
         if (coeffs != nullptr && !haveLinear) {
-            std::vector<const RawNode*> numerators;
-            std::vector<const RawNode*> denominators;
-            if (const RawNode* num = findChild(*coeffs, "COMPU-NUMERATOR")) {
-                for (const auto& value : num->children) {
-                    numerators.push_back(value.get());
-                }
-            }
-            if (const RawNode* den = findChild(*coeffs, "COMPU-DENOMINATOR")) {
-                for (const auto& value : den->children) {
-                    denominators.push_back(value.get());
-                }
-            }
-            const std::optional<double> divisor =
-                denominators.empty() ? std::optional<double>{1.0} : parseDouble(denominators[0]->text);
-            if (numerators.size() == 2 && divisor && *divisor != 0.0) {
-                const auto constant = parseDouble(numerators[0]->text);
-                const auto slope = parseDouble(numerators[1]->text);
-                if (constant && slope) {
-                    haveLinear = true;
-                    out.offset = *constant / *divisor;
-                    out.factor = *slope / *divisor;
-                    const auto lower = parseDouble(childText(*scale, "LOWER-LIMIT"));
-                    const auto upper = parseDouble(childText(*scale, "UPPER-LIMIT"));
-                    if (lower && upper) {
-                        double lo = *lower * out.factor + out.offset;
-                        double hi = *upper * out.factor + out.offset;
-                        if (out.factor < 0) {
-                            std::swap(lo, hi);
-                        }
-                        out.min = lo;
-                        out.max = hi;
-                    }
-                }
-            }
+            haveLinear = applyLinearScale(*scale, out);
             continue;
         }
-        const RawNode* constant = findChild(*scale, "COMPU-CONST");
-        const RawNode* label = constant == nullptr ? nullptr : findChild(*constant, "VT");
-        const auto lower = parseDouble(childText(*scale, "LOWER-LIMIT"));
-        const auto upper = parseDouble(childText(*scale, "UPPER-LIMIT"));
-        if (label != nullptr && lower && upper && *lower == *upper) {
-            bool whole = false;
-            const std::int64_t value = asInteger(*lower, whole);
-            if (whole) {
-                out.valueTable.push_back({value, trimText(label->text)});
-            }
-        }
+        addTextTableEntry(*scale, out);
     }
 }
 
@@ -340,10 +376,10 @@ const Signal* pickModelSignal(const ModelSignals& modelSignals, const Index& ind
     return best;
 }
 
-void warn(ExportDatabase& db, std::string message) {
+void warn(ExportDatabase& database, std::string message) {
     Warning warning;
     warning.message = std::move(message);
-    db.warnings.push_back(std::move(warning));
+    database.warnings.push_back(std::move(warning));
 }
 
 struct FrameParties {
@@ -351,11 +387,10 @@ struct FrameParties {
     std::vector<std::string> receivers;
 };
 
-// Who sends/receives each frame, from FRAME-PORTs on the triggering and from
-// the ECUs' associated PDU groups (the only source in 4.2-era files).
-std::unordered_map<std::string, FrameParties> resolveParties(const ParsedFile& file,
-                                                             const Index& index) {
-    std::unordered_map<std::string, FrameParties> parties;
+using PartyMap = std::unordered_map<std::string, FrameParties>;
+
+// FRAME-PORTs on the frame's triggering.
+void addPortParties(const ParsedFile& file, const Index& index, PartyMap& parties) {
     for (const Frame& frame : file.frames) {
         const std::string& name = frame.common.shortName;
         const auto trig = index.triggerings.find(name);
@@ -370,6 +405,10 @@ std::unordered_map<std::string, FrameParties> resolveParties(const ParsedFile& f
             }
         }
     }
+}
+
+// The ECUs' associated PDU groups: the only source in 4.2-era files.
+void addGroupParties(const ParsedFile& file, const Index& index, PartyMap& parties) {
     std::unordered_map<std::string, std::vector<const Frame*>> framesByPdu;
     for (const Frame& frame : file.frames) {
         for (const FramePduMapping& mapping : frame.pdus) {
@@ -378,7 +417,7 @@ std::unordered_map<std::string, FrameParties> resolveParties(const ParsedFile& f
     }
     for (const auto& [ecu, refs] : index.ecuGroupRefs) {
         for (const std::string& path : refs) {
-            auto group = index.groupsByPath.find(path);
+            const auto group = index.groupsByPath.find(path);
             if (group == index.groupsByPath.end()) {
                 continue;
             }
@@ -390,19 +429,146 @@ std::unordered_map<std::string, FrameParties> resolveParties(const ParsedFile& f
             }
         }
     }
+}
+
+// Who sends/receives each frame.
+PartyMap resolveParties(const ParsedFile& file, const Index& index) {
+    PartyMap parties;
+    addPortParties(file, index, parties);
+    addGroupParties(file, index, parties);
     return parties;
+}
+
+struct Lookups {
+    const Index* index;
+    const ModelSignals* modelSignals;
+    const std::unordered_map<std::string, const Pdu*>* pdus;
+};
+
+// CAN id, addressing, FD and transmitters of a frame; nullopt when it has no
+// CAN-FRAME-TRIGGERING with a parseable IDENTIFIER.
+std::optional<ExportFrame> makeFrameHeader(const Frame& frame, const Index& index,
+                                           const FrameParties& who) {
+    const auto trig = index.triggerings.find(frame.common.shortName);
+    if (trig == index.triggerings.end()) {
+        return std::nullopt;
+    }
+    const RawNode& node = *trig->second;
+    const std::optional<std::uint32_t> frameId = parseId(childText(node, "IDENTIFIER"));
+    if (!frameId) {
+        return std::nullopt;
+    }
+    ExportFrame out;
+    out.name = frame.common.shortName;
+    out.id = *frameId;
+    out.extended = childText(node, "CAN-ADDRESSING-MODE") == "EXTENDED";
+    out.canFd = childText(node, "CAN-FRAME-TX-BEHAVIOR") == "CAN-FD" ||
+                childText(node, "CAN-FRAME-RX-BEHAVIOR") == "CAN-FD";
+    out.length = frame.length;
+    out.transmitters = who.transmitters.empty() ? frame.transmitters : who.transmitters;
+    return out;
+}
+
+// The raw nodes are authoritative over the model whenever they exist: the
+// model folds MOST-SIGNIFICANT-BYTE-LAST (little endian) into big endian and
+// drops 0b-literals.
+void applyRawSignalData(ExportSignal& exported, const std::string& pduName, const Index& index) {
+    const auto packing = index.bigEndian.find(pduName + "\n" + exported.name);
+    if (packing != index.bigEndian.end()) {
+        exported.byteOrder = packing->second ? ByteOrder::MostSignificantByteFirst
+                                             : ByteOrder::LeastSignificantByteFirst;
+    }
+    const auto raw = index.iSignals.find(exported.name);
+    if (raw == index.iSignals.end()) {
+        return;
+    }
+    if (const auto length = parseDouble(childText(*raw->second, "LENGTH"));
+        length && *length >= 0.0 && *length <= 4294967295.0) {
+        exported.bitLength = static_cast<std::uint32_t>(*length);
+    }
+    const RawNode* init = findChild(*raw->second, "INIT-VALUE");
+    const RawNode* value = init == nullptr ? nullptr : findDescendant(*init, "VALUE");
+    if (value != nullptr) {
+        exported.initValue = parseDouble(value->text);
+    }
+}
+
+// Scaling from the I-SIGNAL -> SYSTEM-SIGNAL -> COMPU-METHOD chain, else the model's.
+void applyScaling(ExportSignal& exported, const Signal& signal, const Index& index) {
+    Scaling scaling;
+    if (resolveScaling(index, exported.name, scaling)) {
+        exported.factor = scaling.factor;
+        exported.offset = scaling.offset;
+        exported.min = scaling.min;
+        exported.max = scaling.max;
+        exported.unit = scaling.unit;
+        exported.valueTable = std::move(scaling.valueTable);
+        return;
+    }
+    exported.factor = signal.factor;
+    exported.offset = signal.offset;
+    exported.min = signal.min;
+    exported.max = signal.max;
+    exported.unit = signal.unit.value_or("");
+    exported.valueTable = signal.valueTable.value_or(std::vector<ValueTableEntry>{});
+}
+
+ExportSignal makeSignal(const Signal& signal, const PduSignalMapping& place,
+                        const FramePduMapping& mapping, const std::string& pduName,
+                        const Index& index, const FrameParties& who) {
+    ExportSignal exported;
+    exported.name = place.signalShortNameRef;
+    exported.startBit = place.startPosition + mapping.startPosition;
+    exported.byteOrder = place.byteOrder;
+    exported.bitLength = signal.bitLength;
+    exported.isSigned = signal.isSigned;
+    exported.initValue = signal.initValue;
+    applyRawSignalData(exported, pduName, index);
+    applyScaling(exported, signal, index);
+    // Receivers are frame-wide in 4.2 files (PDU groups carry no
+    // per-signal detail); the study vocabulary lists them per signal.
+    exported.receivers = who.receivers.empty() ? signal.receivers : who.receivers;
+    return exported;
+}
+
+// Signals of one PDU placed in the frame; warns and skips what it cannot export.
+void appendPduSignals(const Lookups& lookups, const std::string& frameName,
+                      const FramePduMapping& mapping, const FrameParties& who, ExportFrame& out,
+                      ExportDatabase& database) {
+    const auto pduIt = lookups.pdus->find(mapping.pduShortNameRef);
+    if (pduIt == lookups.pdus->end()) {
+        warn(database, "Frame '" + frameName + "': PDU '" + mapping.pduShortNameRef +
+                           "' is not exported (multiplexed, container, secured or unknown PDU)");
+        return;
+    }
+    for (const PduSignalMapping& place : pduIt->second->signalMappings) {
+        // An empty ref is an I-SIGNAL-GROUP-REF mapping: groups have no
+        // DBC form and their members are mapped one by one anyway.
+        if (place.signalShortNameRef.empty()) {
+            continue;
+        }
+        const Signal* signal =
+            pickModelSignal(*lookups.modelSignals, *lookups.index, place.signalShortNameRef);
+        if (signal == nullptr) {
+            warn(database, "Frame '" + frameName + "': signal '" + place.signalShortNameRef +
+                               "' is not defined, skipped");
+            continue;
+        }
+        out.signals.push_back(
+            makeSignal(*signal, place, mapping, pduIt->first, *lookups.index, who));
+    }
 }
 
 }  // namespace
 
 ExportDatabase buildExportDatabase(const ParsedFile& file) {
-    ExportDatabase db;
+    ExportDatabase database;
     if (!file.clusters.empty()) {
-        db.busName = file.clusters.front().common.shortName;
-        db.baudrate = file.clusters.front().baudrate;
+        database.busName = file.clusters.front().common.shortName;
+        database.baudrate = file.clusters.front().baudrate;
     }
     for (const EcuInstance& ecu : file.ecuInstances) {
-        db.nodes.push_back(ecu.common.shortName);
+        database.nodes.push_back(ecu.common.shortName);
     }
 
     Index index;
@@ -418,105 +584,22 @@ ExportDatabase buildExportDatabase(const ParsedFile& file) {
         pdus.try_emplace(pdu.common.shortName, &pdu);
     }
     const auto parties = resolveParties(file, index);
+    const Lookups lookups{&index, &modelSignals, &pdus};
 
     for (const Frame& frame : file.frames) {
         const std::string& frameName = frame.common.shortName;
-        const auto trig = index.triggerings.find(frameName);
-        const std::optional<std::uint32_t> id =
-            trig == index.triggerings.end()
-                ? std::nullopt
-                : parseId(childText(*trig->second, "IDENTIFIER"));
-        if (!id) {
-            warn(db, "Frame '" + frameName + "' skipped: no CAN-FRAME-TRIGGERING with an IDENTIFIER");
-            continue;
-        }
-
-        ExportFrame out;
-        out.name = frameName;
-        out.id = *id;
-        out.extended = childText(*trig->second, "CAN-ADDRESSING-MODE") == "EXTENDED";
-        out.canFd = childText(*trig->second, "CAN-FRAME-TX-BEHAVIOR") == "CAN-FD" ||
-                    childText(*trig->second, "CAN-FRAME-RX-BEHAVIOR") == "CAN-FD";
-        out.length = frame.length;
-
         const auto party = parties.find(frameName);
         const FrameParties none;
         const FrameParties& who = party == parties.end() ? none : party->second;
-        out.transmitters = who.transmitters;
-        if (out.transmitters.empty()) {
-            out.transmitters = frame.transmitters;
+        std::optional<ExportFrame> out = makeFrameHeader(frame, index, who);
+        if (!out) {
+            warn(database, "Frame '" + frameName + "' skipped: no CAN-FRAME-TRIGGERING with an IDENTIFIER");
+            continue;
         }
-
         for (const FramePduMapping& mapping : frame.pdus) {
-            const auto pduIt = pdus.find(mapping.pduShortNameRef);
-            if (pduIt == pdus.end()) {
-                warn(db, "Frame '" + frameName + "': PDU '" + mapping.pduShortNameRef +
-                             "' is not exported (multiplexed, container, secured or unknown PDU)");
-                continue;
-            }
-            for (const PduSignalMapping& place : pduIt->second->signalMappings) {
-                // An empty ref is an I-SIGNAL-GROUP-REF mapping: groups have no
-                // DBC form and their members are mapped one by one anyway.
-                if (place.signalShortNameRef.empty()) {
-                    continue;
-                }
-                const Signal* signalPtr = pickModelSignal(modelSignals, index, place.signalShortNameRef);
-                if (signalPtr == nullptr) {
-                    warn(db, "Frame '" + frameName + "': signal '" + place.signalShortNameRef +
-                                 "' is not defined, skipped");
-                    continue;
-                }
-                const Signal& signal = *signalPtr;
-                ExportSignal exported;
-                exported.name = place.signalShortNameRef;
-                exported.startBit = place.startPosition + mapping.startPosition;
-                exported.byteOrder = place.byteOrder;
-                exported.bitLength = signal.bitLength;
-                exported.isSigned = signal.isSigned;
-                exported.initValue = signal.initValue;
-                // The model folds MOST-SIGNIFICANT-BYTE-LAST (little endian)
-                // into big endian and drops 0b-literals; the raw nodes are
-                // authoritative whenever they exist.
-                const auto packing = index.bigEndian.find(pduIt->first + "\n" + exported.name);
-                if (packing != index.bigEndian.end()) {
-                    exported.byteOrder = packing->second ? ByteOrder::MostSignificantByteFirst
-                                                         : ByteOrder::LeastSignificantByteFirst;
-                }
-                if (const auto raw = index.iSignals.find(exported.name); raw != index.iSignals.end()) {
-                    if (const auto length = parseDouble(childText(*raw->second, "LENGTH"));
-                        length && *length >= 0.0 && *length <= 4294967295.0) {
-                        exported.bitLength = static_cast<std::uint32_t>(*length);
-                    }
-                    const RawNode* init = findChild(*raw->second, "INIT-VALUE");
-                    const RawNode* value = init == nullptr ? nullptr : findDescendant(*init, "VALUE");
-                    if (value != nullptr) {
-                        exported.initValue = parseDouble(value->text);
-                    }
-                }
-
-                Scaling scaling;
-                if (resolveScaling(index, exported.name, scaling)) {
-                    exported.factor = scaling.factor;
-                    exported.offset = scaling.offset;
-                    exported.min = scaling.min;
-                    exported.max = scaling.max;
-                    exported.unit = scaling.unit;
-                    exported.valueTable = std::move(scaling.valueTable);
-                } else {
-                    exported.factor = signal.factor;
-                    exported.offset = signal.offset;
-                    exported.min = signal.min;
-                    exported.max = signal.max;
-                    exported.unit = signal.unit.value_or("");
-                    exported.valueTable = signal.valueTable.value_or(std::vector<ValueTableEntry>{});
-                }
-                // Receivers are frame-wide in 4.2 files (PDU groups carry no
-                // per-signal detail); the study vocabulary lists them per signal.
-                exported.receivers = who.receivers.empty() ? signal.receivers : who.receivers;
-                out.signals.push_back(std::move(exported));
-            }
+            appendPduSignals(lookups, frameName, mapping, who, *out, database);
         }
-        db.frames.push_back(std::move(out));
+        database.frames.push_back(std::move(*out));
     }
-    return db;
+    return database;
 }

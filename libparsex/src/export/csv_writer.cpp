@@ -1,5 +1,6 @@
 #include <parsex/export/csv_writer.hpp>
 
+#include <array>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
@@ -25,20 +26,20 @@ void appendField(std::string& out, std::string_view field) {
         return;
     }
     out += '"';
-    for (char c : field) {
-        if (c == '"') {
+    for (const char letter : field) {
+        if (letter == '"') {
             out += '"';
         }
-        out += c;
+        out += letter;
     }
     out += '"';
 }
 
 // std::to_chars gives the shortest round-trip form and never consults the locale, unlike ostream or printf.
 std::string formatNumber(double value) {
-    char buf[64];
-    const auto result = std::to_chars(buf, buf + sizeof(buf), value);
-    return std::string(buf, result.ptr);
+    std::array<char, 64> buffer{};
+    const auto result = std::to_chars(buffer.begin(), buffer.end(), value);
+    return {buffer.data(), result.ptr};
 }
 
 std::string formatOptional(const std::optional<double>& value) {
