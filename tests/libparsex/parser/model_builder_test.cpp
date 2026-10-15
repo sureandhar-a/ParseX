@@ -232,9 +232,33 @@ TEST_F(ModelBuilderRealTest, Pdu) {
     EXPECT_EQ(pdu.signalMappings.at(0).startPosition, 0U);
     EXPECT_EQ(pdu.signalMappings.at(1).signalShortNameRef, "MultiplexedStatic2");
     EXPECT_EQ(pdu.signalMappings.at(1).startPosition, 8U);
-    // The file's PACKING-BYTE-ORDER is MOST-SIGNIFICANT-BYTE-LAST, which the
-    // domain cannot express — pinned here as the documented default fallback.
-    EXPECT_EQ(pdu.signalMappings.at(0).byteOrder, ByteOrder::MostSignificantByteFirst);
+    // No PACKING-BYTE-ORDER here: absent reads as little endian (cantools).
+    EXPECT_EQ(pdu.signalMappings.at(0).byteOrder, ByteOrder::LeastSignificantByteFirst);
+}
+
+TEST_F(ModelBuilderRealTest, PduPackingByteOrder) {
+    const RawNode* node = findNamed(doc().root, "I-SIGNAL-I-PDU", "message1");
+    ASSERT_NE(node, nullptr);
+    std::vector<Warning> warnings;
+    const Pdu pdu = buildPdu(*node, warnings);
+    ASSERT_GE(pdu.signalMappings.size(), 3U);
+    // Counter: MOST-SIGNIFICANT-BYTE-LAST (little); Signal1: ...-FIRST (big).
+    EXPECT_EQ(pdu.signalMappings.at(0).signalShortNameRef, "message1_SeqCounter");
+    EXPECT_EQ(pdu.signalMappings.at(0).byteOrder, ByteOrder::LeastSignificantByteFirst);
+    EXPECT_EQ(pdu.signalMappings.at(2).signalShortNameRef, "signal1");
+    EXPECT_EQ(pdu.signalMappings.at(2).byteOrder, ByteOrder::MostSignificantByteFirst);
+}
+
+TEST_F(ModelBuilderRealTest, SignalBinaryAndOctalLiterals) {
+    std::vector<Warning> warnings;
+    const RawNode* binary = findNamed(doc().root, "I-SIGNAL", "signal1");
+    ASSERT_NE(binary, nullptr);
+    const Signal signal1 = buildSignal(*binary, warnings);
+    EXPECT_EQ(signal1.bitLength, 3U);                             // <LENGTH>0b11
+    EXPECT_EQ(signal1.initValue, std::optional<double>(5.0));     // <VALUE>0b101
+    const RawNode* octal = findNamed(doc().root, "I-SIGNAL", "signal2_1c");
+    ASSERT_NE(octal, nullptr);
+    EXPECT_EQ(buildSignal(*octal, warnings).bitLength, 11U);      // <LENGTH>013
 }
 
 TEST_F(ModelBuilderTinyTest, Signal) {

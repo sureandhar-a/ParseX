@@ -686,9 +686,9 @@ References are joined by short name (last path segment), the same accepted v1 li
 
 Not emitted at all: `CM_` comments, signal groups, and LIN/FlexRay/Ethernet clusters.
 
-### Known model limitation
+### Byte order and numeric literals
 
-The model builder folds `MOST-SIGNIFICANT-BYTE-LAST` (little endian) into big endian. It also rejects `0b` and octal literals, for example `<LENGTH>0b11</LENGTH>` in cantools' `system-4.2.arxml`. The exporter works around this by reading the raw `PACKING-BYTE-ORDER`, `LENGTH` and `INIT-VALUE` nodes from `rawDocument` whenever they exist. The model builder itself is not changed by this feature.
+The exporter takes byte order, bit length and init value straight from the model. The model builder maps `MOST-SIGNIFICANT-BYTE-FIRST` to big endian and every other `PACKING-BYTE-ORDER` (`MOST-SIGNIFICANT-BYTE-LAST`, `OPAQUE`), or an absent one, to little endian, as cantools does. It reads `0x` hex, `0b` binary and leading-zero octal literals, for example `<LENGTH>0b11</LENGTH>` and `<LENGTH>013</LENGTH>` in cantools' `system-4.2.arxml`. Frame IDs, the COMPU-METHOD scaling, units and transmitters/receivers still come from `rawDocument`, because the model does not carry them.
 
 ### Verification
 
