@@ -2,6 +2,7 @@ add_executable(export_tests
     can_db_test.cpp
     dbc_writer_test.cpp
     csv_writer_test.cpp
+    export_e2e_test.cpp
 )
 target_compile_definitions(
     export_tests
