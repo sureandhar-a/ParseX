@@ -5,7 +5,7 @@ if(DEFINED ENV{VCPKG_ROOT})
     set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
 endif()
 
-project(ParseX VERSION 0.1.0 LANGUAGES CXX)
+project(ParseX VERSION 0.2.0 LANGUAGES CXX)
 
 # Single source of truth for the project version. Bumping the release means
 # editing the VERSION above (plus CHANGELOG.md and the packaging manifests,

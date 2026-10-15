@@ -1,11 +1,11 @@
 {
   "$schema": "https://parsex.dev/schemas/v1/envelope.json",
-  "contractVersion": "0.1.0",
+  "contractVersion": "0.2.0",
   "kind": "validationResult",
   "payload": {
     "errors": [],
     "passed": true
   },
-  "toolVersion": "0.1.0"
+  "toolVersion": "0.2.0"
 }
 

@@ -58,8 +58,8 @@ A validation result envelope (`kind: "validationResult"`):
 ```json
 {
     "$schema": "https://parsex.dev/schemas/v1/envelope.json",
-    "contractVersion": "0.1.0",
-    "toolVersion": "0.1.0",
+    "contractVersion": "0.2.0",
+    "toolVersion": "0.2.0",
     "kind": "validationResult",
     "payload": {
         "passed": false,
@@ -80,8 +80,8 @@ A diff report envelope (`kind: "diffReport"`):
 ```json
 {
     "$schema": "https://parsex.dev/schemas/v1/envelope.json",
-    "contractVersion": "0.1.0",
-    "toolVersion": "0.1.0",
+    "contractVersion": "0.2.0",
+    "toolVersion": "0.2.0",
     "kind": "diffReport",
     "payload": {
         "entries": [
