@@ -109,7 +109,7 @@ TEST(JsonContractE2ETest, ReadmeIndexLinksResolveToCommittedFiles) {
     std::ifstream in(readme);
     const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     for (const char* file : {"envelope.schema.json", "validation_result.schema.json",
-                             "diff_report.schema.json", "CONVENTIONS.md", "VERSIONING.md"}) {
+                             "diff_report.schema.json", "export_result.schema.json", "CONVENTIONS.md", "VERSIONING.md"}) {
         EXPECT_NE(text.find(file), std::string::npos) << "README must index " << file;
         EXPECT_TRUE(fs::exists(dir / file)) << "indexed file missing: " << file;
     }

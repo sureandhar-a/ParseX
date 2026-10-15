@@ -215,6 +215,88 @@
           "type": "object"
         },
         "title": "write_arxml"
+      },
+      {
+        "annotations": {
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false,
+          "readOnlyHint": true
+        },
+        "description": "Export an ARXML file's CAN network as DBC or CSV text (returned inline, nothing is written to disk)",
+        "inputSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "description": "Export format",
+              "enum": [
+                "dbc",
+                "csv"
+              ],
+              "type": "string"
+            },
+            "path": {
+              "description": "Input ARXML file path",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "format"
+          ],
+          "type": "object"
+        },
+        "name": "export_arxml",
+        "outputSchema": {
+          "properties": {
+            "kind": {
+              "const": "exportResult"
+            },
+            "payload": {
+              "properties": {
+                "content": {
+                  "type": "string"
+                },
+                "counts": {
+                  "type": "object"
+                },
+                "format": {
+                  "enum": [
+                    "dbc",
+                    "csv"
+                  ],
+                  "type": "string"
+                },
+                "output": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sourcePath": {
+                  "type": "string"
+                },
+                "warnings": {
+                  "type": "array"
+                }
+              },
+              "required": [
+                "sourcePath",
+                "format",
+                "output",
+                "counts",
+                "warnings"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "kind",
+            "payload"
+          ],
+          "type": "object"
+        },
+        "title": "export_arxml"
       }
     ]
   }

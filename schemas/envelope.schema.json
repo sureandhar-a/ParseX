@@ -22,7 +22,7 @@
         },
         "kind": {
             "type": "string",
-            "enum": ["validationResult", "diffReport", "telemetryReport", "parseReport", "writeResult"],
+            "enum": ["validationResult", "diffReport", "telemetryReport", "parseReport", "writeResult", "exportResult"],
             "description": "Discriminator for the kind-specific payload shape. Extensible in later minor versions."
         },
         "payload": {
@@ -43,6 +43,10 @@
         {
             "if": {"properties": {"kind": {"const": "telemetryReport"}}, "required": ["kind"]},
             "then": {"properties": {"payload": {"$ref": "telemetry_report.schema.json"}}}
+        },
+        {
+            "if": {"properties": {"kind": {"const": "exportResult"}}, "required": ["kind"]},
+            "then": {"properties": {"payload": {"$ref": "export_result.schema.json"}}}
         }
     ]
 }

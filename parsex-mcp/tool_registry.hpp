@@ -90,7 +90,7 @@ class ToolRegistry {
         return registry;
     }
 
-    // Full schemas for all four tools, reusing the report shapes.
+    // Full schemas for all five tools, reusing the report shapes.
     // Annotations are hints, not access control: clients must treat them as
     // untrusted metadata when deciding whether to gate confirmation prompts.
     static ToolRegistry withSchemas() {
@@ -156,6 +156,19 @@ class ToolRegistry {
             definition.inputSchema = writeInputSchema();
             definition.outputSchema = writeOutputSchema();
             definition.annotations = writeAnnotations;
+            definition.handler = [](const nlohmann::json&) { return nlohmann::json::object(); };
+            registry.registerTool(std::move(definition));
+        }
+        {
+            ToolDefinition definition;
+            definition.name = "export_arxml";
+            definition.title = "export_arxml";
+            definition.description =
+                "Export an ARXML file's CAN network as DBC or CSV text (returned inline, "
+                "nothing is written to disk)";
+            definition.inputSchema = exportInputSchema();
+            definition.outputSchema = exportOutputSchema();
+            definition.annotations = readOnlyAnnotations;
             definition.handler = [](const nlohmann::json&) { return nlohmann::json::object(); };
             registry.registerTool(std::move(definition));
         }

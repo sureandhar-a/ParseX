@@ -205,6 +205,7 @@ int runServer() {
     registry.setHandler("validate_arxml", validateTool);
     registry.setHandler("diff_arxml", diffTool);
     registry.setHandler("write_arxml", writeTool);
+    registry.setHandler("export_arxml", exportTool);
     std::string line;
     while (std::getline(std::cin, line)) {
         // Empty lines carry no message; skip without responding.

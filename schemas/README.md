@@ -23,6 +23,11 @@ reading required.
   `attributes`). Local-only instrumentation — see
   [`TELEMETRY_SCOPE.md`](TELEMETRY_SCOPE.md) for the deliberate no-phone-home
   scoping decision.
+* [`export_result.schema.json`](export_result.schema.json) — `kind:
+  "exportResult"` payload (`parsex export`, MCP `export_arxml`): `sourcePath`,
+  `format` (`dbc`/`csv`), `output` (path written, or `null` when the text was
+  not written to a file), `counts` (`frames`, `signals`), `warnings`, and
+  `content` (the exported text; present only when `output` is `null`).
 * [`CONVENTIONS.md`](CONVENTIONS.md) — field-naming (camelCase), null-handling
   (omit, don't null), and forward-compatibility (consumers ignore unknown
   fields) rules every payload schema is reviewed against.

@@ -5,6 +5,7 @@ add_executable(cli_tests
     config_test.cpp
     resource_exhaustion_test.cpp
     approval_test.cpp
+    export_cli_test.cpp
 )
 find_package(CLI11 CONFIG REQUIRED)
 target_link_libraries(
