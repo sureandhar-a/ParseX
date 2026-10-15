@@ -1,6 +1,6 @@
 # ParseX — Low-Level Design (LLD)
 
-Last updated: 2026-09-25
+Last updated: 2026-10-15
 Status: reconciled — interface reference below verified against public headers
 Based on: hld.md
 
@@ -27,6 +27,7 @@ the per-component sections below.
 - Diff Engine (`libparsex/include/parsex/diff/`): `class DiffEngine` with `DiffReport diff(oldProject, newProject, ...)` (`diff_engine.hpp`); `DiffReport` with `empty()`, `toText()`, `toJson()` (`diff_report.hpp`); matching/move/populate helpers (`diff_match.hpp`, `diff_moves.hpp`, `diff_populate.hpp`, `diff_fields.hpp`, `diff_nested.hpp`).
 - Write Engine (`libparsex/include/parsex/write/`): `class WriteEngine` with `ValidationResult validate(project) const`, `void write(project, outputPath) const` (`write_engine.hpp`) — dry-run via `validate`, apply via `write`; ordering/format/context helpers (`write_ordering.hpp`, `write_format.hpp`, `write_context.hpp`, `write_elements.hpp`). Invariant: parse-write-reparse is idempotent; output is deterministic pretty print, not byte passthrough.
 - JSON Output Contract (`libparsex/include/parsex/json_contract/`): `wrapEnvelope(kind, payload)` (`envelope.hpp`); `kContractVersion = PARSEX_VERSION (currently "0.1.0")` (`version.hpp`); schema validation helper (`schema_validate.hpp`). Envelope: `$schema`, `contractVersion`, `kind`, `payload`, `toolVersion` (`toolVersion` from `libparsexVersion()`).
+- Export (`libparsex/include/parsex/export/`): `ExportDatabase buildExportDatabase(const ParsedFile&)` (`can_db.hpp`) — resolves CAN IDs, packing, scaling, units and senders into flat `ExportFrame` / `ExportSignal` structs plus `warnings`; `std::string toDbc(const ExportDatabase&)` (`dbc_writer.hpp`) and `std::string toCsv(const ExportDatabase&)` (`csv_writer.hpp`) — pure formatters, no I/O.
 - Telemetry (`libparsex/include/parsex/telemetry/`): `class ScopedSpan` (`scoped_span.hpp`, `PARSEX_SPAN` in `scoped_span_macro.hpp`); `TelemetryConfig::setEnabled(bool)` (`telemetry_config.hpp`); `TelemetryContext::currentTraceAsJson()` (`telemetry_context.hpp`); span/trace/id/status/attribute types (`span.hpp`, `trace.hpp`, `span_id.hpp`, `span_status.hpp`, `attribute.hpp`, `operation_telemetry.hpp`). Zero overhead when disabled; surfaces as `telemetryReport` on stderr via `--trace`.
 - Version (`libparsex/include/parsex/version.hpp`): `libparsexVersion()` — single tool-version source consumed by command line `--version` and every envelope's `toolVersion`.
 - Assistant error model: transport-level JSON-RPC `error` for protocol failures vs. tool-result `isError:true` for engine failures (see `parsex-mcp/dispatch.hpp`) — callers distinguish "call failed" from "tool ran and reported a problem".
@@ -649,6 +650,59 @@ That completes JSON Output Contract's full LLD.
 
 ---
 
+## Component: DBC / CSV Export
+
+Supporting component, not one of the seven full-LLD blocks above. It sits beside the JSON contract and is the only place where the export joins happen. It reads the parsed model plus `ParsedFile::rawDocument`. The Parser, the domain model and the Write Engine are unchanged by it.
+
+### Data model
+
+`ExportDatabase` (`export/can_db.hpp`): `busName`, `baudrate`, `nodes`, `frames[]`, `warnings[]`.
+`ExportFrame`: `name`, `id` (flag bit never set), `extended`, `canFd`, `length`, `transmitters`, `signals[]`.
+`ExportSignal`: `name`, `startBit` (DBC numbering, used verbatim), `bitLength`, `byteOrder`, `isSigned`, `factor`, `offset`, `min`, `max`, `unit`, `initValue`, `receivers`, `valueTable`.
+
+### API contract
+
+- `ExportDatabase buildExportDatabase(const ParsedFile& file)`: the resolver.
+- `std::string toDbc(const ExportDatabase&)` and `std::string toCsv(const ExportDatabase&)`: formatters. Output contracts are in `docs/plans/feature-1-dbc-csv-export.md` (S2, S3).
+
+### Resolution rules
+
+References are joined by short name (last path segment), the same accepted v1 limitation as the model builder. The field-by-field mapping table is in `docs/plans/feature-1-dbc-csv-export.md`. In short:
+
+- Frame ID, extended flag and CAN FD come from the `CAN-FRAME-TRIGGERING` whose `FRAME-REF` matches the frame.
+- Start bit is the PDU mapping `START-POSITION` plus the PDU-to-frame `START-POSITION`, used as is.
+- Byte order comes from `PACKING-BYTE-ORDER`.
+- Factor and offset come from the linear `COMPU-RATIONAL-COEFFS`. Min and max come from the limits scaled by it. A value table comes from `COMPU-CONST` entries where lower equals upper.
+- Senders come from `FRAME-PORT` with direction OUT under an `ECU-INSTANCE`. Receivers come from the ECU PDU groups.
+
+### Warnings
+
+| Condition | Result |
+|---|---|
+| Frame has no `CAN-FRAME-TRIGGERING` with an identifier | Frame skipped, warning |
+| PDU is multiplexed, container, secured or unknown | Frame kept with no signals from that PDU, warning |
+| Signal in a PDU mapping is not defined in the model | Signal skipped, warning |
+| Signal-group mapping (empty signal ref) | Ignored silently; member signals are mapped one by one |
+
+Not emitted at all: `CM_` comments, signal groups, and LIN/FlexRay/Ethernet clusters.
+
+### Known model limitation
+
+The model builder folds `MOST-SIGNIFICANT-BYTE-LAST` (little endian) into big endian. It also rejects `0b` and octal literals, for example `<LENGTH>0b11</LENGTH>` in cantools' `system-4.2.arxml`. The exporter works around this by reading the raw `PACKING-BYTE-ORDER`, `LENGTH` and `INIT-VALUE` nodes from `rawDocument` whenever they exist. The model builder itself is not changed by this feature.
+
+### Verification
+
+On `tests/fixtures/system-4.2.arxml`, every exported frame and signal matches cantools 44 on identifier, extended flag, length, start bit, bit length, byte order, signedness, factor, offset, unit and value table. To reproduce:
+
+```sh
+parsex export -i tests/fixtures/system-4.2.arxml -f dbc -o system.dbc
+python3 scripts/check_dbc_against_cantools.py tests/fixtures/system-4.2.arxml system.dbc
+```
+
+Known gap on the cantools side: cantools ignores the PDU offset inside a frame, so fixtures with a non-zero offset show start-bit differences that are cantools' gap, not the exporter's.
+
+---
+
 ## Component: Schema Registry
 
 **Status: CONFIRMED — full LLD complete (data model, API contract, sequence diagram, internal design, state management, error handling).**
@@ -872,12 +926,13 @@ Built on CLI11 (per the locked tech stack). Full command surface, combining spec
 | `parsex validate <file>` | `Parser::parseFile()` → `Validator::validateFile(parsedFile)` (reuses `rawDocument`, no extra load) |
 | `parsex diff <old> <new>` | `Parser::parseFile()` on both → `DiffEngine::diff()` → human-readable and/or JSON output |
 | `parsex parse <file> --export [--force]` | As `parsex parse`, then `JsonSerializer::exportToFile()` saving `<name>.parsex.json` alongside the source |
+| `parsex export -i <file> -f dbc\|csv [-o <file>]` | `Parser::parseFile()` → `buildExportDatabase()` → `toDbc()` / `toCsv()` → stdout, or an atomic write to `-o` with a summary line. Warnings go to stderr, or to `payload.warnings` under `--json`. |
 | any command + `--timing` | Wraps the call with `Telemetry::beginOperation()`/`endOperation()`, attaches the result as `response.timing` |
 
 No write commands — write access is MCP-only per spec.md's scope decision (`parsex mcp --allow-write`), so the CLI never calls `WriteEngine`.
 
 ### MCP Server
 
-Built on gopher-mcp (per the locked tech stack). Read tools (list/get per domain type) map onto `Parser::parseFile()`/`parseProject()` plus `JsonSerializer::serialize()`, available on every server start. Write tools — one MCP tool call for `planEdit`, a separate one for `applyEdit`, mirroring Write Engine's own preview/confirm split one-to-one — are registered only when the server starts with `--allow-write`, satisfying FR-14/FR-17. A validate tool follows the same `Parser::parseFile()` → `Validator::validateFile()` sequencing as the CLI's `validate` command. `--strict` behavior is exposed as a boolean parameter on the parse tool rather than a flag, but follows identical sequencing to the CLI table above.
+Built on gopher-mcp (per the locked tech stack). Read tools (list/get per domain type) map onto `Parser::parseFile()`/`parseProject()` plus `JsonSerializer::serialize()`, available on every server start. Write tools — one MCP tool call for `planEdit`, a separate one for `applyEdit`, mirroring Write Engine's own preview/confirm split one-to-one — are registered only when the server starts with `--allow-write`, satisfying FR-14/FR-17. A validate tool follows the same `Parser::parseFile()` → `Validator::validateFile()` sequencing as the CLI's `validate` command. The read-only `export_arxml` tool follows `Parser::parseFile()` → `buildExportDatabase()` → `toDbc()` / `toCsv()` and returns the text inline; it is registered on every start, like the read tools. `--strict` behavior is exposed as a boolean parameter on the parse tool rather than a flag, but follows identical sequencing to the CLI table above.
 
 Parser and Validator never reference each other directly in either surface — the sequencing tables above live entirely in the CLI/MCP layer, per the independence decision confirmed earlier in this document.

@@ -3,6 +3,9 @@
 Target release: **v0.2.0** (additive: new CLI command, new MCP tool, new
 envelope `kind`). Source idea: `ParseX-Next-Features.md` §Feature 1.
 
+**Status:** implemented on `feat/dbc-csv-export`; all slices merged; verified
+against cantools 44 (`scripts/check_dbc_against_cantools.py`).
+
 ## What ships
 
 - `parsex export --input <file.arxml> --format dbc|csv [--output <file>]`

@@ -1,6 +1,6 @@
 # ParseX — High-Level Design (HLD)
 
-Last updated: 2026-09-25
+Last updated: 2026-10-15
 Status: reconciled against as-built system
 Based on: spec.md
 
@@ -26,6 +26,7 @@ graph TD
         Validator[Validator]
         DiffEngine[Diff Engine]
         WriteEngine[Write Engine]
+        Export[DBC / CSV Export]
         JSONContract[JSON Output Contract]
         Telemetry[Telemetry]
         SchemaRegistry[Schema Registry]
@@ -65,6 +66,11 @@ graph TD
             WEngine[Write Engine] --> WValidate[Write Validation]
         end
 
+        subgraph ExportBlock[DBC / CSV Export]
+            XResolve[buildExportDatabase - resolves joins] --> XDbc[toDbc]
+            XResolve --> XCsv[toCsv]
+        end
+
         subgraph JSONContract[JSON Output Contract]
             JEnv[Envelope Serializer]
             JDomain[Report Serializers]
@@ -97,15 +103,15 @@ on stderr via `--trace`, not an inline timing field.
 ## 2. Component responsibilities
 
 ### Command line (`parsex-cli`)
-- Owns: argument parsing (CLI11), subcommand dispatch (`parse`/`validate`/`diff`/`write`), human and `--json` output, sysexits exit codes, `--config` / `--schema-cache-dir` precedence, `--trace` timing to stderr.
+- Owns: argument parsing (CLI11), subcommand dispatch (`parse`/`validate`/`diff`/`write`/`export`), human and `--json` output, sysexits exit codes, `--config` / `--schema-cache-dir` precedence, `--trace` timing to stderr.
 - Does NOT own: any parsing/validation/diff/write logic — pure wrapper over `libparsex`.
 
 ### Assistant server (`parsex-mcp`)
-- Owns: stdio JSON-RPC transport (hand-rolled, stdout pure protocol), tool registry with JSON Schemas, protocol `2026-07-28` handling, dry-run-by-default `write_arxml` with explicit apply.
+- Owns: stdio JSON-RPC transport (hand-rolled, stdout pure protocol), tool registry with JSON Schemas, protocol `2026-07-28` handling, dry-run-by-default `write_arxml` with explicit apply, and read-only `export_arxml` (text returned inline, never written to disk).
 - Does NOT own: domain logic or report shapes — delegates to `libparsex`. No startup write-enable flag; no separate preview/confirm calls.
 
 ### `libparsex` (core library)
-- Owns: everything ARXML-specific — parsing, validation, semantic diff, the round-trip write engine, JSON serialization.
+- Owns: everything ARXML-specific — parsing, validation, semantic diff, the round-trip write engine, DBC/CSV export, JSON serialization.
 - Does NOT own: presentation (CLI text) or transport (MCP) — those belong to its two consumers.
 
 ## 2a. Internal breakdown — libparsex
@@ -128,6 +134,10 @@ on stderr via `--trace`, not an inline timing field.
 ### Write Engine
 1. **Write Engine** — rebuilds schema-valid output from the typed model with stable ordering and pretty printing. Not a byte splicer: comments and unmodeled content are not preserved (see README limitations).
 2. **Write validation + atomic output** — validates before persisting and writes via temp-then-rename so a failure leaves the original intact.
+
+### DBC / CSV Export
+1. **Resolver (`buildExportDatabase`)** — the only place the export joins happen. It reads the typed model plus the raw document and produces a flat `ExportDatabase` (frames with IDs, packing, scaling, units, senders; warnings for anything it could not resolve). The domain model is not changed for export.
+2. **Formatters (`toDbc`, `toCsv`)** — pure functions over `ExportDatabase`. No I/O; the CLI decides between stdout and an atomic file write.
 
 ### JSON Output Contract
 1. **Envelope Serializer** — the common wrapper (`$schema`, `contractVersion`, `kind`, `payload`, `toolVersion`).
@@ -159,6 +169,7 @@ graph LR
 
 1. **Command-line validate:** user → `parsex-cli` → Parser (secure load → release detect → model build, consulting Schema Registry) → Validator (XSD + semantic) → merged report envelope → human text or `--json` on stdout, timing on stderr with `--trace`.
 2. **Assistant write:** agent → `parsex-mcp` (`write_arxml`) → Write Engine validates and returns a dry-run preview → agent sends an explicit apply → atomic write → `writeResult` envelope. No server startup flag and no separate confirm-call protocol as built.
+3. **Export:** user or agent → `parsex-cli export` or `parsex-mcp` (`export_arxml`) → Parser → `buildExportDatabase` → `toDbc` or `toCsv` → stdout, an atomic file write (CLI `--output` only), or the `exportResult` envelope inline (MCP).
 
 ## 4. Technology stack
 

@@ -1,6 +1,6 @@
 # ParseX CLI (`parsex`)
 
-`parsex` is the command-line surface around `libparsex` — the first of the Epic's two independently-usable delivery surfaces (the other is `parsex-mcp`). It wraps the Parser, Validator, Diff Engine, and Write Engine behind a stable, scriptable interface with both human-readable and machine-readable (`--json`) output, `sysexits.h`-aligned exit codes, and `flag > env > config > default` configuration precedence.
+`parsex` is the command-line surface around `libparsex` — the first of the Epic's two independently-usable delivery surfaces (the other is `parsex-mcp`). It wraps the Parser, Validator, Diff Engine, Write Engine, and DBC/CSV export behind a stable, scriptable interface with both human-readable and machine-readable (`--json`) output, `sysexits.h`-aligned exit codes, and `flag > env > config > default` configuration precedence.
 
 This document is the single reference for every flag, subcommand, exit code, and config behavior implemented in the CLI Feature (Sprint 10). It is kept in sync with the actual `--help` output — no documented flag without an implementation, no implementation without documentation.
 
@@ -220,6 +220,56 @@ parsex --json write --input <file> --output <file> [--apply]
   # {"kind":"writeResult","payload":{"applied":false,"input":"…","output":"/tmp/out.arxml","success":true},…}
   ```
 
+### `export` — Export the CAN network as DBC or CSV
+
+```
+parsex export --input <file> --format dbc|csv [--output <file>]
+parsex --json export --input <file> --format dbc|csv [--output <file>]
+parsex export --help
+```
+
+* **Options**
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `-i, --input <file>` | yes | Input ARXML file (`CLI::ExistingFile`). |
+| `-f, --format <dbc\|csv>` | yes | Output format. Any other value is rejected at parse time. |
+| `-o, --output <file>` | no | Write the export to this file, atomically. Without it the text goes to stdout. |
+
+* **Behavior** — calls `Parser::parseFile()`, then `buildExportDatabase()` (resolves CAN IDs, packing, scaling, units and senders from the ARXML), then `toDbc()` or `toCsv()`. Nothing is written unless `--output` is given.
+
+  * stdout (default, human): the DBC or CSV text only, so it can be piped. No summary line.
+  * `--output` (human): one summary line, `Exported <F> frames, <S> signals to <file> (<format>)`.
+  * Warnings go to stderr as `parsex: warning: <message>` in human mode. Under `--json` they appear only in `payload.warnings`.
+  * Exit `0` on success. A malformed or unreadable ARXML file fails with the usual mapping (see *Exit codes*).
+
+* **JSON (`--json`)** — `wrapEnvelope("exportResult", {sourcePath, format, output, counts{frames, signals}, warnings[{message}], content?})`. `output` is the written path, or `null` when the text was not written to a file. `content` (the exported text) is present only when `output` is `null`. Schema: `schemas/export_result.schema.json`.
+
+* **What is exported** — CAN frames from `CAN-FRAME-TRIGGERING` (ID, extended, CAN FD), signals with their PDU packing (start bit, length, byte order, signedness, initial value), `COMPU-METHOD` scaling (factor, offset, min/max), value tables, units, and transmitters/receivers from the FRAME-PORTs and ECU PDU groups.
+  * DBC: `VERSION`, `BU_`, `BO_`, `SG_`, `BO_TX_BU_` for frames with several senders, `VFrameFormat` and `BusType` attributes when any frame is CAN FD, and `VAL_` value tables.
+  * CSV: RFC 4180 with CRLF line endings and a 19-column header (`frame,frame_id,extended,can_fd,length,transmitters,signal,start_bit,bit_length,byte_order,signed,factor,offset,min,max,unit,init_value,receivers,value_table`). A frame with no signals still gets one row.
+
+* **Not exported** (each produces a warning; the rest of the file is still exported)
+  * Frames without a `CAN-FRAME-TRIGGERING` carrying an identifier: the frame is skipped.
+  * Multiplexed, container, secured and unknown PDUs: the frame is kept with no signals from that PDU.
+  * Signals referenced by a PDU mapping but not defined in the model: skipped.
+  * Signal groups (no DBC form), `CM_` comments, and LIN/FlexRay/Ethernet clusters.
+
+* **Examples**
+
+  ```sh
+  # DBC to a file
+  parsex export --input tests/fixtures/system-4.2.arxml --format dbc --output system.dbc
+  # Exported 8 frames, 11 signals to system.dbc (dbc)
+
+  # CSV to stdout, pipeable
+  parsex export -i tests/fixtures/system-4.2.arxml -f csv > system.csv
+
+  # --json (machine-readable, text not written to a file)
+  parsex --json export -i tests/fixtures/system-4.2.arxml -f csv
+  # {"kind":"exportResult","payload":{"counts":{"frames":8,"signals":11},"format":"csv","output":null,"sourcePath":"tests/fixtures/system-4.2.arxml","warnings":[…],"content":"frame,frame_id,…"},…}
+  ```
+
 ## Exit codes
 
 Adapted from BSD `sysexits.h` — a small, well-known subset rather than a bespoke scheme so scripts get conventional, greppable statuses. Other `sysexits.h` values have no CLI-observable trigger and are deliberately omitted.
@@ -284,6 +334,14 @@ parsex write --input tests/fixtures/schema_valid.arxml --output /tmp/out.arxml
 # write — apply json
 parsex --json write --input tests/fixtures/schema_valid.arxml --output /tmp/out.arxml --apply
 # {"kind":"writeResult","payload":{"applied":true,"input":"…","output":"/tmp/out.arxml","success":true},…}
+
+# export — human, to a file
+parsex export --input tests/fixtures/system-4.2.arxml --format dbc --output /tmp/out.dbc
+# Exported 8 frames, 11 signals to /tmp/out.dbc (dbc)
+
+# export — json, text inline
+parsex --json export --input tests/fixtures/system-4.2.arxml --format csv
+# {"kind":"exportResult","payload":{"counts":{"frames":8,"signals":11},"format":"csv","output":null,…,"content":"frame,…"},…}
 ```
 
 ## Testing
@@ -294,6 +352,7 @@ parsex --json write --input tests/fixtures/schema_valid.arxml --output /tmp/out.
 * **Config precedence** — `ctest -R cli\.precedence` (`flag > env > config > default` via `ENVIRONMENT`).
 * **Golden-file** — `ctest -R ApprovalTests` via `ApprovalTests.cpp` (header-only, vcpkg `approval-tests-cpp`). Human and `--json` are both approved for all four subcommands; `.approved.txt` files live in `tests/cli/` and are reviewed before commit. To regenerate after an intentional output change: run `ctest -R ApprovalTests`, review the `.received.txt` diff, then `cp …/approval_test.*.received.txt …/approval_test.*.approved.txt`.
 * **Sanitizers** — `cmake --preset build-asan && cmake --build build/asan && ASAN_OPTIONS=detect_leaks=0 ctest --test-dir build/asan -R "cli|ApprovalTests|Classify|CliJsonOutput|ConfigExtras|ColorEnabled"` (the `parsex-cli` target links `parsex_sanitizers` explicitly).
+* **Export** — `tests/cli/export_cli_test.cpp` covers the `export` flags, stdout/`--output` behaviour and the `exportResult` envelope. `tests/libparsex/export/export_e2e_test.cpp` covers ARXML to DBC/CSV end to end. `scripts/check_dbc_against_cantools.py` cross-checks the DBC output against cantools (`pip install cantools`).
 
 ## Cross-links
 

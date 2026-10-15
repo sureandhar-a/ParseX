@@ -17,6 +17,13 @@ bump means.
   and `docs/cli-efficiency.md` (per-command test evidence plus
   memory/time/usability analysis), plus
   `scripts/measure_tokens.py` repro harness and a README highlight.
+- DBC and CSV export of a file's CAN network: `parsex export --input <file>
+  --format dbc|csv [--output <file>]` (stdout unless `--output`), the
+  read-only `export_arxml` MCP tool, and the `exportResult` JSON envelope
+  kind with `schemas/export_result.schema.json`. Frame IDs, packing,
+  scaling, units, value tables and senders/receivers are resolved from the
+  ARXML. Anything that cannot be exported is reported as a warning. Library
+  API: `buildExportDatabase()`, `toDbc()`, `toCsv()`.
 
 ### Fixed
 

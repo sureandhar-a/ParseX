@@ -1,8 +1,8 @@
 # ParseX Bridge (`parsex-mcp`)
 
-`parsex-mcp` is the assistant-facing surface around `libparsex` — alongside the command-line surface (`parsex`, see `docs/cli.md`). It exposes the Parser, Validator, Diff Engine, and Write Engine as callable tools over stdio, so an assistant can parse, validate, diff, and safely edit ARXML files directly in a conversation, without a human first running the command line by hand.
+`parsex-mcp` is the assistant-facing surface around `libparsex` — alongside the command-line surface (`parsex`, see `docs/cli.md`). It exposes the Parser, Validator, Diff Engine, Write Engine, and DBC/CSV export as callable tools over stdio, so an assistant can parse, validate, diff, safely edit, and export ARXML files directly in a conversation, without a human first running the command line by hand.
 
-The two surfaces share engines and output shapes: each tool's `structuredContent` is the same report envelope the command line emits (`parseReport`, `validationResult`, `diffReport`, `writeResult` per the JSON Output Contract). If you know one, you know the other's results — see `docs/cli.md` for the human and `--json` forms.
+The two surfaces share engines and output shapes: each tool's `structuredContent` is the same report envelope the command line emits (`parseReport`, `validationResult`, `diffReport`, `writeResult`, `exportResult` per the JSON Output Contract). If you know one, you know the other's results — see `docs/cli.md` for the human and `--json` forms.
 
 This document is kept in sync with the actual `tools/list` output — no documented tool without an implementation, no implementation without documentation.
 
@@ -123,6 +123,29 @@ Apply:
 
 Description surfaced to models states the preview default and confirmation step directly, so an assistant with no other context previews first.
 
+### `export_arxml` — Export the CAN network as DBC or CSV
+
+Annotations: `readOnly:true, destructive:false, idempotent:true, openWorld:false`. The tool never writes to disk; the export text is returned inline. To write a file, use `parsex export --output` (see `docs/cli.md`).
+
+Input:
+
+```json
+{"type":"object","properties":{"path":{"type":"string","description":"Input ARXML file path"},"format":{"type":"string","enum":["dbc","csv"],"description":"Export format"}},"required":["path","format"],"additionalProperties":false}
+```
+
+Output (`exportResult` envelope). `payload` has `sourcePath, format, output` (always `null` here), `counts{frames, signals}`, `warnings[{message}]` and `content` (the DBC or CSV text). The text `content` of the result is a one-line summary.
+
+Example:
+
+```sh
+# request
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"export_arxml","arguments":{"path":"tests/fixtures/system-4.2.arxml","format":"csv"}}}
+# response (summary line; structuredContent carries the full envelope)
+Exported 8 frames, 11 signals as csv from tests/fixtures/system-4.2.arxml (4 warnings)
+```
+
+Frames and signals that cannot be exported are listed in `warnings` rather than failing the call. Same rules as `parsex export`: see the *Not exported* list in `docs/cli.md`.
+
 ## Limitations (honest scope)
 
 * Version handling is scoped down: speaks stateless `2026-07-28` with per-request `_meta`, detects but does not support older `initialize`-handshake clients — they get a clear version error rather than silent misbehavior.
@@ -134,6 +157,7 @@ Description surfaced to models states the preview default and confirmation step 
 ## Testing
 
 * Pipe tests (`ctest -R "transport.pipe|protocol.pipe"`) drive the built binary over real stdin/stdout, including hostile input (`transport.pipe_survives_hostile_input`: 100k-deep nesting and a huge unterminated id).
+* Export tool behaviour is covered by `tests/mcp/export_tools_test.cpp`.
 * Golden transcripts (`ctest -R McpApproval`) record full sessions (`server/discover -> tools/list -> tools/call` plus per-tool, error, and version sessions). To regenerate after an intentional change: run, review `.received.txt`, copy over `.approved.txt` when correct.
 * Sanitizers: `cmake --preset build-asan && ASAN_OPTIONS=detect_leaks=0 ctest --test-dir build/asan -R "transport.pipe|protocol.pipe|McpApproval|ReadTools|WriteTool|Dispatch"` — zero findings, including untrusted byte input.
 
