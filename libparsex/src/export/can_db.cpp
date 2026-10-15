@@ -455,6 +455,11 @@ ExportDatabase buildExportDatabase(const ParsedFile& file) {
                 continue;
             }
             for (const PduSignalMapping& place : pduIt->second->signalMappings) {
+                // An empty ref is an I-SIGNAL-GROUP-REF mapping: groups have no
+                // DBC form and their members are mapped one by one anyway.
+                if (place.signalShortNameRef.empty()) {
+                    continue;
+                }
                 const Signal* signalPtr = pickModelSignal(modelSignals, index, place.signalShortNameRef);
                 if (signalPtr == nullptr) {
                     warn(db, "Frame '" + frameName + "': signal '" + place.signalShortNameRef +
@@ -478,7 +483,8 @@ ExportDatabase buildExportDatabase(const ParsedFile& file) {
                                                          : ByteOrder::LeastSignificantByteFirst;
                 }
                 if (const auto raw = index.iSignals.find(exported.name); raw != index.iSignals.end()) {
-                    if (const auto length = parseDouble(childText(*raw->second, "LENGTH"))) {
+                    if (const auto length = parseDouble(childText(*raw->second, "LENGTH"));
+                        length && *length >= 0.0 && *length <= 4294967295.0) {
                         exported.bitLength = static_cast<std::uint32_t>(*length);
                     }
                     const RawNode* init = findChild(*raw->second, "INIT-VALUE");

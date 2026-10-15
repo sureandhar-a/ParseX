@@ -34,7 +34,10 @@ std::string readAll(const fs::path& path) {
 
 // Runs the CLI with args; stdout and stderr are captured separately.
 CliRun runCli(const std::string& args) {
-    const fs::path errFile = fs::temp_directory_path() / "parsex_export_cli_stderr.txt";
+    // Per-test name: ctest -j runs each test in its own process concurrently.
+    const fs::path errFile = fs::temp_directory_path() /
+        ("parsex_export_cli_stderr_" +
+         std::string(::testing::UnitTest::GetInstance()->current_test_info()->name()) + ".txt");
     const std::string cmd =
         "\"" + std::string(PARSEX_CLI_BINARY) + "\" " + args + " 2>\"" + errFile.string() + "\"";
     std::array<char, 4096> buf{};
