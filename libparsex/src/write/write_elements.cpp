@@ -64,8 +64,8 @@ std::string doubleToString(double value) {
 // - Frame.transmitters: dropped (senders live behind FRAME-TRIGGERINGs).
 // - Signal.startBit when non-zero: dropped (packing lives on the owning
 //   PDU's I-SIGNAL-TO-I-PDU-MAPPING, captured in PduSignalMapping instead).
-// - Signal byteOrder when non-default: PACKING-BYTE-ORDER omitted (both the
-//   real LAST-variant and absence map to the domain default).
+// - Signal byteOrder when non-default: dropped (I-SIGNAL has no byte order;
+//   packing lives on PduSignalMapping, which round-trips it).
 // - Signal.receivers: dropped (no per-I-SIGNAL receiver list in the schema).
 // - Signal.valueTable: dropped (real value tables live in COMPU-METHODs,
 //   separate elements out of v1 scope).
@@ -172,6 +172,11 @@ xmlNodePtr buildPduElement(xmlDocPtr doc, const Pdu& value) {
             // are minOccurs=0 and mutually exclusive) and reads back as
             // empty, preserving round-trip. Group identity itself is out of
             // v1 scope.
+            // Absent PACKING-BYTE-ORDER reads back as little endian, so only
+            // big endian needs spelling out.
+            if (mapping.byteOrder == ByteOrder::MostSignificantByteFirst) {
+                appendTextChild(entry, "PACKING-BYTE-ORDER", "MOST-SIGNIFICANT-BYTE-FIRST");
+            }
             appendTextChild(entry, "START-POSITION",
                             std::to_string(mapping.startPosition));
         }

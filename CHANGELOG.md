@@ -27,6 +27,11 @@ bump means.
 
 ### Fixed
 
+- Model builder byte order: `MOST-SIGNIFICANT-BYTE-LAST` and an absent
+  `PACKING-BYTE-ORDER` now read as little endian (they were folded into big
+  endian), and the writer emits `PACKING-BYTE-ORDER` for big-endian mappings.
+- Model builder reads AUTOSAR `0b` binary and leading-zero octal literals
+  (`<LENGTH>0b11</LENGTH>`, `<LENGTH>013</LENGTH>`) instead of dropping them.
 - `parsex-mcp` no longer crashes on a single hostile line. Requests nested
   deeper than 128 levels are rejected before parsing with a `-32600` error
   (previously ~100k levels overflowed the stack while reading `params`), and

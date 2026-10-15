@@ -91,7 +91,7 @@ std::optional<double> parseUnsigned(const std::string& digits, int base) {
 }
 
 // AUTOSAR numeric literals may be 0x-hex or 0b-binary (system-4.2 has
-// `<LENGTH>0b11</LENGTH>`), which the model builder's parsers reject.
+// `<LENGTH>0b11</LENGTH>`).
 // "0" alone and decimals like "0.1" stay on the stod path.
 std::optional<double> parseDouble(const std::string& raw) {
     const std::string text = trimText(raw);
@@ -161,8 +161,6 @@ struct Index {
     std::unordered_map<std::string, Group> groupsByPath;
     std::unordered_map<std::string, FramePort> framePorts;
     std::vector<std::pair<std::string, std::vector<std::string>>> ecuGroupRefs;  // ecu, refs
-    // "<pdu>\n<signal>" -> PACKING-BYTE-ORDER is MOST-SIGNIFICANT-BYTE-FIRST.
-    std::unordered_map<std::string, bool> bigEndian;
 };
 
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
@@ -184,14 +182,6 @@ void buildIndex(const RawNode& node, const std::string& pkgPath, const std::stri
         index.compuMethods.try_emplace(nameOf(node), &node);
     } else if (tag == "UNIT") {
         index.units.try_emplace(nameOf(node), childText(node, "DISPLAY-NAME"));
-    } else if (tag == "I-SIGNAL-I-PDU") {
-        std::vector<const RawNode*> mappings;
-        collectDescendants(node, "I-SIGNAL-TO-I-PDU-MAPPING", mappings);
-        for (const RawNode* mapping : mappings) {
-            index.bigEndian.try_emplace(
-                nameOf(node) + "\n" + shortNameOfRef(childText(*mapping, "I-SIGNAL-REF")),
-                childText(*mapping, "PACKING-BYTE-ORDER") == "MOST-SIGNIFICANT-BYTE-FIRST");
-        }
     } else if (tag == "I-SIGNAL-I-PDU-GROUP") {
         Group group;
         group.out = childText(node, "COMMUNICATION-DIRECTION") == "OUT";
@@ -469,30 +459,6 @@ std::optional<ExportFrame> makeFrameHeader(const Frame& frame, const Index& inde
     return out;
 }
 
-// The raw nodes are authoritative over the model whenever they exist: the
-// model folds MOST-SIGNIFICANT-BYTE-LAST (little endian) into big endian and
-// drops 0b-literals.
-void applyRawSignalData(ExportSignal& exported, const std::string& pduName, const Index& index) {
-    const auto packing = index.bigEndian.find(pduName + "\n" + exported.name);
-    if (packing != index.bigEndian.end()) {
-        exported.byteOrder = packing->second ? ByteOrder::MostSignificantByteFirst
-                                             : ByteOrder::LeastSignificantByteFirst;
-    }
-    const auto raw = index.iSignals.find(exported.name);
-    if (raw == index.iSignals.end()) {
-        return;
-    }
-    if (const auto length = parseDouble(childText(*raw->second, "LENGTH"));
-        length && *length >= 0.0 && *length <= 4294967295.0) {
-        exported.bitLength = static_cast<std::uint32_t>(*length);
-    }
-    const RawNode* init = findChild(*raw->second, "INIT-VALUE");
-    const RawNode* value = init == nullptr ? nullptr : findDescendant(*init, "VALUE");
-    if (value != nullptr) {
-        exported.initValue = parseDouble(value->text);
-    }
-}
-
 // Scaling from the I-SIGNAL -> SYSTEM-SIGNAL -> COMPU-METHOD chain, else the model's.
 void applyScaling(ExportSignal& exported, const Signal& signal, const Index& index) {
     Scaling scaling;
@@ -514,8 +480,8 @@ void applyScaling(ExportSignal& exported, const Signal& signal, const Index& ind
 }
 
 ExportSignal makeSignal(const Signal& signal, const PduSignalMapping& place,
-                        const FramePduMapping& mapping, const std::string& pduName,
-                        const Index& index, const FrameParties& who) {
+                        const FramePduMapping& mapping, const Index& index,
+                        const FrameParties& who) {
     ExportSignal exported;
     exported.name = place.signalShortNameRef;
     exported.startBit = place.startPosition + mapping.startPosition;
@@ -523,7 +489,6 @@ ExportSignal makeSignal(const Signal& signal, const PduSignalMapping& place,
     exported.bitLength = signal.bitLength;
     exported.isSigned = signal.isSigned;
     exported.initValue = signal.initValue;
-    applyRawSignalData(exported, pduName, index);
     applyScaling(exported, signal, index);
     // Receivers are frame-wide in 4.2 files (PDU groups carry no
     // per-signal detail); the study vocabulary lists them per signal.
@@ -554,8 +519,7 @@ void appendPduSignals(const Lookups& lookups, const std::string& frameName,
                                "' is not defined, skipped");
             continue;
         }
-        out.signals.push_back(
-            makeSignal(*signal, place, mapping, pduIt->first, *lookups.index, who));
+        out.signals.push_back(makeSignal(*signal, place, mapping, *lookups.index, who));
     }
 }
 

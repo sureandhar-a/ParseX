@@ -28,12 +28,6 @@ std::string asciiUpperCopy(std::string text) {
     return text;
 }
 
-bool isHexPrefixed(const std::string& text) {
-    const std::size_t digits =
-        (text.at(0) == '+' || text.at(0) == '-') ? std::size_t{1} : std::size_t{0};
-    return text.compare(digits, 2, "0x") == 0 || text.compare(digits, 2, "0X") == 0;
-}
-
 const RawNode* findChild(const RawNode& node, const std::string& tag) {
     for (const auto& child : node.children) {
         if (child->tagName == tag) {
@@ -74,6 +68,34 @@ std::optional<std::string> childText(const RawNode& node, const std::string& tag
     return trimText(child->text);
 }
 
+// Base of an AUTOSAR integer literal (sign already stripped): 0x-hex, 0b-binary,
+// leading-zero octal (`013` is 11), else decimal; `prefix` is the digits' offset.
+int literalBase(const std::string& digits, std::size_t& prefix) {
+    prefix = 0;
+    if (digits.size() > 2 && digits[0] == '0') {
+        if (digits[1] == 'x' || digits[1] == 'X') {
+            prefix = 2;
+            return 16;
+        }
+        if (digits[1] == 'b' || digits[1] == 'B') {
+            prefix = 2;
+            return 2;
+        }
+    }
+    if (digits.size() > 1 && digits[0] == '0' &&
+        digits.find_first_not_of("01234567") == std::string::npos) {
+        prefix = 1;
+        return 8;
+    }
+    return 10;
+}
+
+bool isPrefixedLiteral(const std::string& text) {
+    const std::size_t sign = (text.at(0) == '+' || text.at(0) == '-') ? 1 : 0;
+    std::size_t prefix = 0;
+    return literalBase(text.substr(sign), prefix) != 10;
+}
+
 std::optional<std::int64_t> parseInteger(const std::string& raw) {
     const std::string text = trimText(raw);
     if (text.empty()) {
@@ -86,9 +108,16 @@ std::optional<std::int64_t> parseInteger(const std::string& raw) {
             negative = text.at(0) == '-';
             pos = 1;
         }
+        std::size_t prefix = 0;
+        const int base = literalBase(text.substr(pos), prefix);
         unsigned long long magnitude = 0;
-        if (isHexPrefixed(text)) {
-            magnitude = std::stoull(text.substr(pos + 2), nullptr, 16);
+        if (base != 10) {
+            std::size_t used = 0;
+            const std::string digits = text.substr(pos + prefix);
+            magnitude = std::stoull(digits, &used, base);
+            if (used != digits.size()) {
+                return std::nullopt;
+            }
         } else {
             const long long signedValue = std::stoll(text.substr(pos));
             if (negative) {
@@ -126,7 +155,7 @@ std::optional<double> parseDouble(const std::string& raw) {
         return std::nullopt;
     }
     try {
-        if (isHexPrefixed(text)) {
+        if (isPrefixedLiteral(text)) {
             const std::optional<std::int64_t> asInt = parseInteger(text);
             if (!asInt.has_value()) {
                 return std::nullopt;
@@ -154,14 +183,12 @@ std::string shortNameOfRef(const std::string& ref) {
     return text.substr(slash + 1);
 }
 
+// Only MOST-SIGNIFICANT-BYTE-FIRST is big endian; MOST-SIGNIFICANT-BYTE-LAST,
+// LEAST-SIGNIFICANT-BYTE-FIRST and OPAQUE are little endian (cantools agrees).
 ByteOrder parseByteOrder(const std::string& raw) {
-    const std::string text = asciiUpperCopy(trimText(raw));
-    if (text == "LEAST-SIGNIFICANT-BYTE-FIRST") {
-        return ByteOrder::LeastSignificantByteFirst;
-    }
-    // Anything else (including MOST-SIGNIFICANT-BYTE-LAST, which the domain
-    // cannot express) falls back to the domain default — see header.
-    return ByteOrder::MostSignificantByteFirst;
+    return asciiUpperCopy(trimText(raw)) == "MOST-SIGNIFICANT-BYTE-FIRST"
+               ? ByteOrder::MostSignificantByteFirst
+               : ByteOrder::LeastSignificantByteFirst;
 }
 
 // Signed iff the base-type short name looks like S16 / SINT8 / ... — the
@@ -355,6 +382,9 @@ Pdu buildPdu(const RawNode& node, std::vector<Warning>& warnings) {
                     : childText(*mapping, "PACKING-BYTE-ORDER");
             if (order.has_value()) {
                 entry.byteOrder = parseByteOrder(order.value());
+            } else if (mapping->tagName == "I-SIGNAL-TO-I-PDU-MAPPING") {
+                // Absent PACKING-BYTE-ORDER reads as little endian, as in cantools.
+                entry.byteOrder = ByteOrder::LeastSignificantByteFirst;
             }
             pdu.signalMappings.push_back(std::move(entry));
         }

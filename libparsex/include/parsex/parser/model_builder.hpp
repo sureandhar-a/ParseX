@@ -77,8 +77,13 @@
 // genuinely new R21-11 nesting needs a fixture-driven revisit.
 //
 // Known approximations (domain-fidelity gaps, not bugs):
-// - ByteOrder has only First-variants: MOST-SIGNIFICANT-BYTE-LAST and friends
-//   fall back to MostSignificantByteFirst (the domain default).
+// - Byte order: only MOST-SIGNIFICANT-BYTE-FIRST is big endian; every other
+//   value (MOST-SIGNIFICANT-BYTE-LAST, LEAST-SIGNIFICANT-BYTE-FIRST, OPAQUE)
+//   and an absent PACKING-BYTE-ORDER on an I-SIGNAL-TO-I-PDU-MAPPING read as
+//   little endian, matching cantools. Study-vocabulary mappings without
+//   BYTE-ORDER keep the domain default (MostSignificantByteFirst).
+// - Integer literals follow the AUTOSAR pattern: decimal, 0x-hex, 0b-binary
+//   and leading-zero octal (`013` is 11).
 // - I-SIGNAL signedness is heuristical: BASE-TYPE-REF's short name matching
 //   S(INT|[0-9]) (S16, SINT8, ...) counts as signed; the authoritative
 //   BASE-TYPE-ENCODING lives on the referenced SW-BASE-TYPE element, which a
