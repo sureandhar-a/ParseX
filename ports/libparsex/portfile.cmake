@@ -5,11 +5,9 @@ vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO sureandhar-a/ParseX
     REF "v${VERSION}"
-    # PINNED ON RELEASE: replace with the real SHA512 of the vX.Y.Z source
-    # archive when the release tag is cut (the pre-release checklist covers
-    # this). The tag does not exist until the first release, so no real hash
-    # can be recorded yet.
-    SHA512 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+    # Pinned to the v0.2.0 source archive; re-pin on every release (see
+    # docs/release-checklist.md "Port hash pinning").
+    SHA512 398744336abd283594145d6fef112c814c5dc7a0e169ff1a6226ce846a505dcb52bb37c60e70eefbf3a784ce3113913d0d033413ea10cee160de4b8f927e631e
     HEAD_REF main
 )
 
