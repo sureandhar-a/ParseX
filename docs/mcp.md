@@ -51,7 +51,7 @@ Identity reply (`server/discover`):
   "resultType": "complete",
   "supportedVersions": ["2026-07-28"],
   "capabilities": {"tools": {"listChanged": false}},
-  "_meta": {"io.modelcontextprotocol/serverInfo": {"name": "parsex-mcp", "version": "0.1.0"}}
+  "_meta": {"io.modelcontextprotocol/serverInfo": {"name": "parsex-mcp", "version": "0.2.0"}}
 }
 ```
 

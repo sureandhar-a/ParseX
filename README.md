@@ -1,7 +1,7 @@
 # ParseX
 
 [![CI](https://github.com/sureandhar-a/ParseX/actions/workflows/ci.yml/badge.svg)](https://github.com/sureandhar-a/ParseX/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 ParseX is an ARXML parsing, validation, diffing, safe editing, and DBC/CSV export toolkit built specifically for AUTOSAR XML semantics. Unlike a generic XML tool, it understands AUTOSAR schema versions through a shared schema registry and exposes the same core engine through both a scriptable command line and an assistant-facing server.
@@ -51,14 +51,14 @@ building — pick your platform's file from the
 [Releases page](https://github.com/sureandhar-a/ParseX/releases), unpack it,
 and run:
 
-- `parsex-v0.1.0-Linux.tar.gz` — Linux x86-64
-- `parsex-v0.1.0-macOS.tar.gz` — macOS arm64
-- `parsex-v0.1.0-Windows.tar.gz` — Windows x86-64
+- `parsex-v0.2.0-Linux.tar.gz` — Linux x86-64
+- `parsex-v0.2.0-macOS.tar.gz` — macOS arm64
+- `parsex-v0.2.0-Windows.tar.gz` — Windows x86-64
 
 ```bash
-tar xzf parsex-v0.1.0-macOS.tar.gz
+tar xzf parsex-v0.2.0-macOS.tar.gz
 ./bin/parsex-cli --version
-# 0.1.0
+# 0.2.0
 ./bin/parsex-cli parse --input share/parsex/examples/sample.arxml
 ```
 

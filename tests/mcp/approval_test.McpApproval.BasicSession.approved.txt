@@ -5,7 +5,7 @@
     "_meta": {
       "io.modelcontextprotocol/serverInfo": {
         "name": "parsex-mcp",
-        "version": "0.1.0"
+        "version": "0.2.0"
       }
     },
     "capabilities": {
@@ -314,7 +314,7 @@
     "resultType": "complete",
     "structuredContent": {
       "$schema": "https://parsex.dev/schemas/v1/envelope.json",
-      "contractVersion": "0.1.0",
+      "contractVersion": "0.2.0",
       "kind": "parseReport",
       "payload": {
         "autosarRelease": "4.2.2",
@@ -329,7 +329,7 @@
         "sourcePath": "<fixtures>/schema_valid.arxml",
         "warnings": []
       },
-      "toolVersion": "0.1.0"
+      "toolVersion": "0.2.0"
     }
   }
 }
